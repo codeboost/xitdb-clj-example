@@ -1,6 +1,7 @@
 (ns xitdb-clj-example.xitdb
   (:require
-    [xitdb-clj-example.xitdb-types :as xtypes])
+    [xitdb-clj-example.xitdb-types :as xtypes]
+    [xitdb-clj-example.xitdb-util :as util])
   (:import
     (clojure.lang Associative)
     [io.github.radarroark.xitdb
@@ -120,6 +121,8 @@
         (fn cursor)
         nil))))
 
+
+
 (defn xitdb-reset! [history new-value]
   (append-context
     history
@@ -131,7 +134,13 @@
   (let [cursor (.getCursor history -1)]
     (xtypes/read-from-cursor cursor)))
 
+(defprotocol IHistory
+  (history [this]))
+
 (deftype XITDBDatabase [db]
+  IHistory
+  (history [this]
+    (db-history db))
   clojure.lang.IDeref
   (deref [_]
     (let [history (db-history db)
@@ -144,9 +153,16 @@
       (xitdb-reset! history new-value)
       new-value)))
 
+(defn xitdb-assoc-in! [db k v]
+  (let [history (history db)]
+    (append-context history (fn [cursor]
+                              (let [wm (WriteHashMap. cursor)]
+                                (util/xitdb-assoc-in wm k v))))))
+
 (defn example-3 []
   (let [db (->XITDBDatabase (open-db :memory))]
-    (reset! db {:foo "bar"})
+    (reset! db {:users {1 {:name "Florin"}}})
+    (xitdb-assoc-in! db [:users 1] {:name "FLORIN"})
     @db))
 
 (defn example-2 []

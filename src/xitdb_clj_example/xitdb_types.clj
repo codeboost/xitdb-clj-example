@@ -133,7 +133,25 @@
   (print-method (into [] o) w))
 
 
+(defprotocol IDb
+  (db [this] "Returns the db handle"))
+
+
+(defn transact! [db fn]
+  (let [history (WriteArrayList. (.rootCursor db))]
+    (.appendContext
+      history
+      (.getSlot history -1)
+      (reify Database$ContextFunction
+        (^void run [_ ^WriteCursor cursor]
+          (fn cursor)
+          nil)))))
+
 (deftype XITDBHashMap [rhm]
+  IDb
+  (db [this]
+    (.-db (.-cursor rhm)))
+
   clojure.lang.ILookup
   (valAt [this key]
     (.valAt this key nil))
@@ -159,7 +177,7 @@
       (when-not (nil? v)
         (clojure.lang.MapEntry. key v))))
 
-  (assoc [_ _ _]
+  (assoc [this k v]
     (throw (UnsupportedOperationException. "XITDBHashMap is read-only")))
 
   clojure.lang.IPersistentMap

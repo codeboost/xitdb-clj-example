@@ -51,37 +51,72 @@
         (throw (IllegalArgumentException. (str "Unsupported type: " (type v)))))))
   cursor)
 
+(defn value-for [v]
+  (cond
+    (string? v)
+    (Database$Bytes. v)
+
+    (keyword? v)
+    (Database$Bytes. (str v))
+
+    (integer? v)
+    (Database$Uint. v)
+
+    (boolean? v)
+    (Database$Uint. (if v 1 0))
+
+    :else
+    (throw (IllegalArgumentException. (str "Unsupported type: " (type v))))))
+
+(defn assoc-value [cursor k v]
+  (let [k (str k)]
+
+    (.putKey cursor k (Database$Bytes. k))
+
+    (cond
+      (map? v)
+      (let [v-cursor (.putCursor cursor k)]
+        (map->WriteHashMap! v-cursor v))
+
+      (sequential? v)
+      (let [v-cursor (.putCursor cursor k)]
+        (coll->WriteArrayList! v-cursor v))
+
+      (string? v)
+      (.put cursor k (Database$Bytes. v))
+
+      (keyword? v)
+      (.put cursor k (Database$Bytes. (str v)))
+
+      (integer? v)
+      (.put cursor k (Database$Uint. v))
+
+      (boolean? v)
+      (.put cursor k (Database$Uint. (if v 1 0)))
+
+      :else
+      (throw (IllegalArgumentException. (str "Unsupported type: " (type v)))))))
+
+
+(defn keypath-cursor [cursor ks]
+  (loop [ks ks
+         cursor cursor]
+    (let [key (first ks)]
+      (println "key:" key)
+      (if (and cursor key)
+        (recur (next ks) (.putCursor cursor (str key)))
+        cursor))))
+
+(defn xitdb-assoc-in [cursor ks v]
+  (let [write-cursor (keypath-cursor cursor (butlast ks))
+        whm (WriteHashMap. write-cursor)]
+    (assoc-value whm (last ks) v)))
+
 (defn map->WriteHashMap! [cursor m]
   (println "Writing hashmap: " m)
   (let [cursor (WriteHashMap. cursor)]
     (doseq [[k v] m]
-      (let [k (str k)]
-
-        (.putKey cursor k (Database$Bytes. k))
-
-        (cond
-          (map? v)
-          (let [v-cursor (.putCursor cursor k)]
-            (map->WriteHashMap! v-cursor v))
-
-          (sequential? v)
-          (let [v-cursor (.putCursor cursor k)]
-            (coll->WriteArrayList! v-cursor v))
-
-          (string? v)
-          (.put cursor k (Database$Bytes. v))
-
-          (keyword? v)
-          (.put cursor k (Database$Bytes. (str v)))
-
-          (integer? v)
-          (.put cursor k (Database$Uint. v))
-
-          (boolean? v)
-          (.put cursor k (Database$Uint. (if v 1 0)))
-
-          :else
-          (throw (IllegalArgumentException. (str "Unsupported type: " (type v))))))))
+      (assoc-value cursor k v)))
   cursor)
 
 (defn WriteHashMap->map [cursor])
