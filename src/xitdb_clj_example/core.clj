@@ -8,7 +8,9 @@
             WriteArrayList WriteHashMap]
            [java.io File RandomAccessFile]))
 
-(defn run [{:keys [db-kind]}]
+(def db-kind :memory)
+
+(defn run []
   (with-open [ra (case db-kind
                    :file (RandomAccessFile. (File. "main.db") "rw")
                    :memory (RandomAccessMemory.))]
