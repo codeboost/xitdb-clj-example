@@ -1,0 +1,212 @@
+(ns xitdb-clj-example.xitdb-types
+  (:require
+    [xitdb-clj-example.xitdb-util :as util])
+  (:import
+    (clojure.lang Associative IReduceInit)
+    [io.github.radarroark.xitdb
+     CoreFile CoreMemory Hasher Database
+     Database$ContextFunction Database$Bytes Database$Uint
+     RandomAccessMemory WriteArrayList WriteHashMap
+     ReadArrayList ReadLinkedArrayList ReadHashMap Tag
+     WriteCursor]
+    [java.io File RandomAccessFile]
+    [java.security MessageDigest]))
+
+(defn read-from-cursor [cursor]
+  (let [value-tag (-> cursor .slot .tag)]
+    (cond
+      (contains? #{Tag/SHORT_BYTES Tag/BYTES} value-tag)
+      (let [s (String. (.readBytes cursor nil))]
+        (if (.startsWith s ":")
+          (keyword s)
+          s))
+
+      (= value-tag Tag/UINT)
+      (.readUint cursor)
+
+      (= value-tag Tag/HASH_MAP)
+      (XITDBHashMap. (ReadHashMap. cursor))
+
+      (= value-tag Tag/ARRAY_LIST)
+      (XITDBArrayList. (ReadArrayList. cursor))
+
+      :else
+      nil)))
+
+(deftype XITDBArrayList [ral]
+  clojure.lang.IPersistentCollection
+  (seq [_]
+    (try
+      (let [iter (.iterator ral)
+            items (loop [result []]
+                    (if (.hasNext iter)
+                      (let [cursor (.next iter)
+                            value (read-from-cursor cursor)]
+                        (recur (conj result value)))
+                      result))]
+        (seq items))
+      (catch Exception e
+        (throw (RuntimeException. "Error creating seq from XITDBArrayList" e)))))
+
+  (count [_]
+    (try
+      (.count ral)
+      (catch Exception e
+        (throw (RuntimeException. "Error getting count from XITDBArrayList" e)))))
+
+  (cons [_ o]
+    (throw (UnsupportedOperationException. "XITDBArrayList is read-only")))
+
+  (empty [_]
+    (throw (UnsupportedOperationException. "XITDBArrayList is read-only")))
+
+  (equiv [this other]
+    (and (sequential? other)
+         (= (count this) (count other))
+         (every? identity (map = this other))))
+
+  clojure.lang.Sequential  ;; Add this to mark as sequential
+
+  clojure.lang.Indexed
+  (nth [_ i]
+    (try
+      (let [cursor (.getCursor ral (long i))]
+        (read-from-cursor cursor))
+      (catch Exception e
+        (throw (RuntimeException. (str "Error getting item at index " i) e)))))
+
+  (nth [_ i not-found]
+    (try
+      (let [cursor (.getCursor ral (long i))]
+        (if cursor
+          (read-from-cursor cursor)
+          not-found))
+      (catch Exception _
+        not-found)))
+
+  clojure.lang.ILookup
+  (valAt [this k]
+    (if (number? k)
+      (.nth this (long k))
+      (throw (IllegalArgumentException. "Key must be a number"))))
+
+  (valAt [this k not-found]
+    (if (number? k)
+      (.nth this (long k) not-found)
+      not-found))
+
+  clojure.lang.IFn
+  (invoke [this k]
+    (.valAt this k))
+
+  (invoke [this k not-found]
+    (.valAt this k not-found))
+
+  (applyTo [this args]
+    (case (count args)
+      1 (.invoke this (first args))
+      2 (.invoke this (first args) (second args))
+      (throw (IllegalArgumentException. "Wrong number of args passed to XITDBArrayList"))))
+
+  clojure.lang.IReduceInit
+  (reduce [_ f init]
+    (try
+      (let [iter (.iterator ral)]
+        (loop [result init]
+          (if (.hasNext iter)
+            (let [cursor (.next iter)
+                  value (read-from-cursor cursor)
+                  new-result (f result value)]
+              (if (reduced? new-result)
+                @new-result
+                (recur new-result)))
+            result)))
+      (catch Exception e
+        (throw (RuntimeException. "Error reducing XITDBArrayList" e)))))
+
+  Object
+  (toString [this]
+    (pr-str (into [] this))))
+
+(defmethod print-method XITDBArrayList [o ^java.io.Writer w]
+  (.write w "#XITDBArrayList")
+  (print-method (into [] o) w))
+
+
+(deftype XITDBHashMap [rhm]
+  clojure.lang.ILookup
+  (valAt [this key]
+    (.valAt this key nil))
+
+  (valAt [this key not-found]
+    (try
+      (let [cursor (.getCursor rhm (str key))]
+        (if (nil? cursor)
+          not-found
+          (read-from-cursor cursor)))
+      (catch Exception e
+        (println "Exception: " e)
+        not-found)))
+
+  clojure.lang.Associative
+  (containsKey [this key]
+    (try
+      (not (nil? (.getCursor rhm (str key))))
+      (catch Exception _ false)))
+
+  (entryAt [this key]
+    (let [v (.valAt this key nil)]
+      (when-not (nil? v)
+        (clojure.lang.MapEntry. key v))))
+
+  (assoc [_ _ _]
+    (throw (UnsupportedOperationException. "XITDBHashMap is read-only")))
+
+  clojure.lang.IPersistentMap
+  (without [_ _]
+    (throw (UnsupportedOperationException. "XITDBHashMap is read-only")))
+
+  (count [_]
+    (.count rhm))
+
+  clojure.lang.IPersistentCollection
+  (cons [_ _]
+    (throw (UnsupportedOperationException. "XITDBHashMap is read-only")))
+
+  (empty [_]
+    (throw (UnsupportedOperationException. "XITDBHashMap is read-only")))
+
+  (equiv [this other]
+    (and (instance? clojure.lang.IPersistentMap other)
+         (= (into {} this) (into {} other))))
+
+  clojure.lang.Seqable
+  (seq [this]
+    (let [iterator (.iterator rhm)]
+      (loop [entries []
+             has-next (.hasNext iterator)]
+        (if has-next
+          (let [cursor (.next iterator)
+                kv-pair (.readKeyValuePair cursor)
+                key-cursor (.-keyCursor kv-pair)]
+            (if (some? key-cursor)
+              (let [key (String. (.readBytes key-cursor nil))
+                    ;; ideally, the db should support it as a native type
+                    key (if (.startsWith key ":") (keyword (.substring key 1)) key)
+                    value-cursor (.-valueCursor kv-pair)
+                    value (read-from-cursor value-cursor)]
+                (recur (conj entries (clojure.lang.MapEntry. key value))
+                       (.hasNext iterator)))
+              (recur entries (.hasNext iterator))))
+          (seq entries)))))
+
+  clojure.lang.IFn
+  (invoke [this k]
+    (.valAt this k))
+
+  (invoke [this k not-found]
+    (.valAt this k not-found))
+
+  Object
+  (toString [this]
+    (str (into {} this))))
