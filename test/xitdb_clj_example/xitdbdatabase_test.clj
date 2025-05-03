@@ -118,6 +118,7 @@
       (swap! db assoc-in [:users 1 :age] 44)
       (is (= {:users {"1" {:name "john" :age 44}}} (materialize @db))))
 
+
     (testing "dissoc"
       (reset! db {:users {"1" {:name "john"}}})
       (swap! db dissoc :users)
@@ -151,8 +152,16 @@
     (testing "assoc-in"
       (reset! db [1 2 {:title "Untitled"} 3 4])
       (swap! db assoc-in [2 :title] "Titled")
-
       (is (= [1 2 {:title "Titled"} 3 4]
-             (materialize @db)))
+             (materialize @db))))))
 
+
+(deftest AssocInTest
+  (let [db (xdb/xit-db :memory)]
+    (testing "assoc-in more"
+      (reset! db [1 2 {:users [{:name "jp"}
+                               {:name "cj"}]} 3 4])
+      (swap! db assoc-in [2 :users 1 :name] "maria")
+      (is (= [1 2 {:users [{:name "jp"} {:name "maria"}]} 3 4]
+             (materialize @db)))
       @db)))

@@ -72,16 +72,18 @@
     :else
     (throw (IllegalArgumentException. (str "Unsupported type: " (type v))))))
 
-(defn value-for! [cursor v]
+(defn value-for! [cursor v & [keep?]]
   (cond
     (map? v)
     (do
-      (.write cursor nil) ;; if there's anything, we clear it
+      (when-not keep?
+        (.write cursor nil)) ;; if there's anything, we clear it
       (.slot (map->WriteHashMap! cursor v)))
 
     (sequential? v)
     (do
-      (.write cursor nil)
+      (when-not keep?
+        (.write cursor nil))
       (.slot (coll->WriteArrayList! cursor v)))
     :else
     (primitive-for v)))
@@ -96,19 +98,22 @@
       (.write cursor (value-for! cursor v)))))
 
 (defn assoc-value [whm k v]
-  (let [k (str k)]
 
-    (cond
-      (map? v)
-      (let [v-cursor (.putCursor whm k)]
-        (map->WriteHashMap! v-cursor v))
+  (let [k (str k)
+        cursor (.putCursor whm k)]
+    (.write cursor (value-for! cursor v true))
 
-      (sequential? v)
-      (let [v-cursor (.putCursor whm k)]
-        (coll->WriteArrayList! v-cursor v))
+    #_(cond
+        (map? v)
+        (let [v-cursor (.putCursor whm k)]
+          (map->WriteHashMap! v-cursor v))
 
-      :else
-      (.put whm k (primitive-for v)))))
+        (sequential? v)
+        (let [v-cursor (.putCursor whm k)]
+          (coll->WriteArrayList! v-cursor v))
+
+        :else
+        (.put whm k (primitive-for v)))))
 
 (defn writer-obj [cursor]
   (let [tag (-> cursor .slot .tag)]
