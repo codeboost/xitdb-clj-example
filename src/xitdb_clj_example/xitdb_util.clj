@@ -50,9 +50,30 @@
         (throw (IllegalArgumentException. (str "Unsupported type: " (type v))))))
     (.-cursor write-array)))
 
-(defn value-for [cursor v]
+(defn primitive-for [v]
   (cond
 
+    (string? v)
+    (Database$Bytes. v)
+
+    (keyword? v)
+    (Database$Bytes. (str v))
+
+    ;;TODO: Database$Int doesn't work (stores null)
+    (integer? v)
+    (Database$Uint. v)
+
+    (boolean? v)
+    (Database$Uint. (if v 1 0))
+
+    (float? v)
+    (Database$Float. v)
+
+    :else
+    (throw (IllegalArgumentException. (str "Unsupported type: " (type v))))))
+
+(defn value-for! [cursor v]
+  (cond
     (map? v)
     (do
       (.write cursor nil) ;; if there's anything, we clear it
@@ -62,21 +83,17 @@
     (do
       (.write cursor nil)
       (.slot (coll->WriteArrayList! cursor v)))
-
-    (string? v)
-    (Database$Bytes. v)
-
-    (keyword? v)
-    (Database$Bytes. (str v))
-
-    (integer? v)
-    (Database$Uint. v)
-
-    (boolean? v)
-    (Database$Uint. (if v 1 0))
-
     :else
-    (throw (IllegalArgumentException. (str "Unsupported type: " (type v))))))
+    (primitive-for v)))
+
+(defn array-list-assoc-value [wal i v]
+  (when (> i (.count wal))
+    (throw (IllegalArgumentException. "Index out of bounds")))
+
+  (if (= i (.count wal))
+    (.append wal (value-for! (.cursor wal) v))
+    (let [cursor (.putCursor wal i)]
+      (.write cursor (value-for! cursor v)))))
 
 (defn assoc-value [whm k v]
   (let [k (str k)]
@@ -90,23 +107,8 @@
       (let [v-cursor (.putCursor whm k)]
         (coll->WriteArrayList! v-cursor v))
 
-      (string? v)
-      (.put whm k (Database$Bytes. v))
-
-      (keyword? v)
-      (.put whm k (Database$Bytes. (str v)))
-
-      (integer? v)
-      (.put whm k (Database$Int. v))
-
-      (float? v)
-      (.put whm k (Database$Float. v))
-
-      (boolean? v)
-      (.put whm k (Database$Uint. (if v 1 0)))
-
       :else
-      (throw (IllegalArgumentException. (str "Unsupported type: " (type v)))))))
+      (.put whm k (primitive-for v)))))
 
 (defn writer-obj [cursor]
   (let [tag (-> cursor .slot .tag)]
@@ -139,7 +141,7 @@
 
 (defn xitdb-assoc-in [cursor ks v]
   (let [cursor (keypath-cursor cursor ks)]
-    (.write cursor (value-for cursor v))))
+    (.write cursor (value-for! cursor v))))
 
 (defn map->WriteHashMap! [cursor m]
   (let [whm (WriteHashMap. cursor)]

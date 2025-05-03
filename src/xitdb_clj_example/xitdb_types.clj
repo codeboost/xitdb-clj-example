@@ -118,17 +118,6 @@
 (defprotocol IDb
   (db [this] "Returns the db handle"))
 
-
-(defn transact! [db fn]
-  (let [history (WriteArrayList. (.rootCursor db))]
-    (.appendContext
-      history
-      (.getSlot history -1)
-      (reify Database$ContextFunction
-        (^void run [_ ^WriteCursor cursor]
-          (fn cursor)
-          nil)))))
-
 (deftype XITDBHashMap [rhm]
   IDb
   (db [this]

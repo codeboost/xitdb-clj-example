@@ -1,6 +1,8 @@
 (ns xitdb-clj-example.xitdb.db
   (:require
     [xitdb-clj-example.xitdb-types :as xtypes]
+
+    [xitdb-clj-example.xitdb-write-types :as wtypes]
     [xitdb-clj-example.xitdb-util :as util])
   (:import
     (clojure.lang Associative)
@@ -59,6 +61,18 @@
 (defn close-db! [db]
   (.close (.-core db)))
 
+(defn xitdb-swap! [db f & args]
+  (let [history (db-history db)]
+    (append-context history (fn [cursor]
+                              (let [tag (-> cursor .slot .tag)
+                                    obj (cond
+                                          (contains? #{Tag/NONE Tag/HASH_MAP} tag)
+                                          (wtypes/->XITDBWriteHashMap (WriteHashMap. cursor))
+
+                                          (= Tag/ARRAY_LIST tag)
+                                          (wtypes/->XITDBWriteArrayList (WriteArrayList. cursor)))]
+                                    (apply f (concat [obj] args)))))))
+
 
 (defprotocol IHistory
   (history [this]))
@@ -79,9 +93,21 @@
       (xitdb-reset! history new-value)
       new-value))
   (swap [this f]
-    (let [history (db-history db)]
-      (append-context history f)
-      (deref this))))
+    (xitdb-swap! db f)
+    (deref this))
+
+  (swap [this f a]
+    (xitdb-swap! db f a)
+    (deref this))
+
+  (swap [this f a1 a2]
+    (xitdb-swap! db f a1 a2)
+    (deref this))
+
+  (swap [this f x y args]
+    (apply xitdb-swap! (concat [db f x y] args))
+    (deref this)))
+
 
 (defn xit-db [filename]
   (->XITDBDatabase (open-database filename)))

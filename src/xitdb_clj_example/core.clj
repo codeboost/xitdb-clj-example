@@ -90,14 +90,18 @@
                           (let [moment (WriteHashMap. cursor)
                                 fruits (WriteArrayList. (.putCursor moment "fruits"))
                                 people (WriteArrayList. (.putCursor moment "people"))]
-                            (.put moment "foo" (Database$Bytes. "bar"))))))
+                            (.put moment "foo" (Database$Bytes. "bar"))
 
-      (.appendContext history
-                      nil
-                      (reify Database$ContextFunction
-                        (^void run [this ^WriteCursor cursor]
-                          (let [moment (WriteHashMap. cursor)
-                                settings (WriteHashMap. (.putCursor moment "settings"))])))))))
+                            (.append fruits (Database$Bytes. "one"))
+                            (.append fruits (Database$Bytes. "two"))
+
+                            (.put fruits 1 (Database$Bytes. "zero"))))))
+
+
+      (let [moment (ReadHashMap. (.getCursor history -1))
+            fruits (ReadArrayList. (.getCursor moment "fruits"))]
+        (is (= "one" (String. (.readBytes (.getCursor fruits 0) nil))))
+        (is (= "two" (String. (.readBytes (.getCursor fruits 1) nil))))))))
 
 
 

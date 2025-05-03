@@ -102,6 +102,57 @@
 (deftest SwapTest
   (let [db (xdb/xit-db :memory)]
     (reset! db {:foo :bar})
-    (swap! db (fn [cursor]))
+    (is (= {:foo :bar} (materialize @db)))
 
-    @db))
+    (testing "arity-1 assoc"
+      (swap! db #(assoc % :some 43))
+      (is (= {:foo :bar :some 43} (materialize @db))))
+
+    (testing "arity-2 assoc"
+      (swap! db assoc :some 44))
+
+    (testing "arity-3 assoc"
+      (reset! db {:users {"1" {:name "john"}}})
+      (is (= {:users {"1" {:name "john"}}} (materialize @db)))
+
+      (swap! db assoc-in [:users 1 :age] 44)
+      (is (= {:users {"1" {:name "john" :age 44}}} (materialize @db))))
+
+    (testing "dissoc"
+      (reset! db {:users {"1" {:name "john"}}})
+      (swap! db dissoc :users)
+      (is (= {} (materialize @db)))
+
+      (reset! db {:users [] :foo :stays})
+      (swap! db dissoc :users)
+      (is (= {:foo :stays} (materialize @db))))
+
+    (testing "more dissoc"
+      (reset! db {:users {"1" {:name "john"}}})
+      (swap! db dissoc :users)
+      (is (= {} (materialize @db))))))
+
+(deftest SwapArray
+  (let [db (xdb/xit-db :memory)]
+    (testing "assoc"
+      (reset! db [1 2 3])
+      (swap! db #(assoc % 0 44))
+      (is (= [44 2 3] (materialize @db)))
+
+      (swap! db #(assoc % 3 99))
+      (is (= [44 2 3 99] (materialize @db)))
+      @db)
+
+    (testing "conj"
+      (reset! db [1 2 3])
+      (swap! db conj 55)
+      (is (= [1 2 3 55] (materialize @db))))
+
+    (testing "assoc-in"
+      (reset! db [1 2 {:title "Untitled"} 3 4])
+      (swap! db assoc-in [2 :title] "Titled")
+
+      (is (= [1 2 {:title "Titled"} 3 4]
+             (materialize @db)))
+
+      @db)))
