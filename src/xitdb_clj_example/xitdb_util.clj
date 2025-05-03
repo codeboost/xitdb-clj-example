@@ -33,7 +33,7 @@
         (integer? v)
         (.append write-array (Database$Uint. v))
 
-        (sequential? v)
+        (seq? v)
         (let [v-cursor (.appendCursor write-array)]
           (coll->WriteArrayList! v-cursor v))
 
@@ -80,7 +80,7 @@
         (.write cursor nil)) ;; if there's anything, we clear it
       (.slot (map->WriteHashMap! cursor v)))
 
-    (sequential? v)
+    (coll? v)
     (do
       (when-not keep?
         (.write cursor nil))
@@ -93,9 +93,9 @@
     (throw (IllegalArgumentException. "Index out of bounds")))
 
   (if (= i (.count wal))
-    (.append wal (value-for! (.cursor wal) v))
+    (.append wal (value-for! (.cursor wal) v true))
     (let [cursor (.putCursor wal i)]
-      (.write cursor (value-for! cursor v)))))
+      (.write cursor (value-for! cursor v true)))))
 
 (defn assoc-value [whm k v]
 
@@ -149,10 +149,22 @@
     (.write cursor (value-for! cursor v))))
 
 (defn map->WriteHashMap! [cursor m]
-  (let [whm (WriteHashMap. cursor)]
-    (doseq [[k v] m]
-      (assoc-value whm k v))
-    (.-cursor whm)))
+  (cond
+    (contains? #{Tag/NONE Tag/HASH_MAP} (-> cursor .slot .tag))
+    (let [whm (WriteHashMap. cursor)]
+      (doseq [[k v] m]
+        (assoc-value whm k v))
+      (.-cursor whm))
+
+    (= Tag/ARRAY_LIST (-> cursor .slot .tag))
+    (let [wal (WriteArrayList. cursor)
+          [k v] (first m)]
+      (assert (nil? (second m))) ;; only one key-val pair
+      (array-list-assoc-value wal k v)
+      (.-cursor wal))
+
+    :else
+    (throw (IllegalArgumentException.))))
 
 (defn WriteHashMap->map [cursor])
 
@@ -161,7 +173,7 @@
     (map? v)
     (map->WriteHashMap! cursor v)
 
-    (sequential? v)
+    (coll? v)
     (coll->WriteArrayList! cursor v)
 
     :else

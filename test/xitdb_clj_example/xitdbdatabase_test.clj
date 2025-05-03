@@ -30,7 +30,6 @@
       (is (= {:foo {:bar :Baz}} (materialize @db)))
 
       (reset! db {:foo {:bar {:some "baz"}}})
-
       (is (= {:foo {:bar {:some "baz"}}} (materialize @db)))
 
       (xdb/xitdb-assoc-in! db [:foo :bar :some] [1 2 3 4])
@@ -109,7 +108,8 @@
       (is (= {:foo :bar :some 43} (materialize @db))))
 
     (testing "arity-2 assoc"
-      (swap! db assoc :some 44))
+      (swap! db assoc :some 44)
+      (is (= {:foo :bar :some 44} (materialize @db))))
 
     (testing "arity-3 assoc"
       (reset! db {:users {"1" {:name "john"}}})
@@ -153,6 +153,13 @@
       (reset! db [1 2 {:title "Untitled"} 3 4])
       (swap! db assoc-in [2 :title] "Titled")
       (is (= [1 2 {:title "Titled"} 3 4]
+             (materialize @db))))
+
+    (testing "update-in"
+      (reset! db [1 2 {:users [{:name "jp"}
+                               {:name "cj"}]} 3 4])
+      (swap! db update-in [2 :users] conj {:name "fl"})
+      (is (= [1 2 {:users [{:name "jp"} {:name "cj"} {:name "fl"}]} 3 4]
              (materialize @db))))))
 
 
@@ -165,3 +172,14 @@
       (is (= [1 2 {:users [{:name "jp"} {:name "maria"}]} 3 4]
              (materialize @db)))
       @db)))
+
+#_(deftest SwapMerge
+    (let [db (xdb/xit-db :memory)]
+      (reset! db {"1" {:name "jp"}
+                  "2" {:name "cj"}})
+
+      (swap! db merge {"3" {:name "maria"}})
+      (materialize @db)))
+
+
+

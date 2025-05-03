@@ -59,7 +59,11 @@
     (Database. core hasher)))
 
 (defn close-db! [db]
-  (.close (.-core db)))
+  (let [core-file (-> db .-db .-core)
+        field (.getDeclaredField CoreFile "file")
+        _ (.setAccessible field true)
+        file (.get field core-file)]
+    (.close file)))
 
 (defn xitdb-swap! [db f & args]
   (let [history (db-history db)]
@@ -71,7 +75,7 @@
 
                                           (= Tag/ARRAY_LIST tag)
                                           (wtypes/->XITDBWriteArrayList (WriteArrayList. cursor)))]
-                                    (apply f (concat [obj] args)))))))
+                                (apply f (concat [obj] args)))))))
 
 
 (defprotocol IHistory
