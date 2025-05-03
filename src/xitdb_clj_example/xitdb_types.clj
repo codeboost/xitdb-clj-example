@@ -12,26 +12,8 @@
     [java.io File RandomAccessFile]
     [java.security MessageDigest]))
 
-(defn read-from-cursor [cursor]
-  (let [value-tag (-> cursor .slot .tag)]
-    (cond
-      (contains? #{Tag/SHORT_BYTES Tag/BYTES} value-tag)
-      (let [s (String. (.readBytes cursor nil))]
-        (if (.startsWith s ":")
-          (keyword s)
-          s))
+(declare read-from-cursor)
 
-      (= value-tag Tag/UINT)
-      (.readUint cursor)
-
-      (= value-tag Tag/HASH_MAP)
-      (XITDBHashMap. (ReadHashMap. cursor))
-
-      (= value-tag Tag/ARRAY_LIST)
-      (XITDBArrayList. (ReadArrayList. cursor))
-
-      :else
-      nil)))
 
 (deftype XITDBArrayList [ral]
   clojure.lang.IPersistentCollection
@@ -225,6 +207,39 @@
   (invoke [this k not-found]
     (.valAt this k not-found))
 
+  java.lang.Iterable
+  (iterator [this]
+    (let [entries (seq this)
+          entry-iter (when entries (.iterator (java.util.ArrayList. entries)))]
+      (reify java.util.Iterator
+        (hasNext [_]
+          (and entry-iter (.hasNext entry-iter)))
+        (next [_]
+          (.next entry-iter))
+        (remove [_]
+          (throw (UnsupportedOperationException. "XITDBHashMap iterator is read-only"))))))
+
   Object
   (toString [this]
     (str (into {} this))))
+
+(defn read-from-cursor [cursor]
+  (let [value-tag (some-> cursor .slot .tag)]
+    (cond
+      (contains? #{Tag/SHORT_BYTES Tag/BYTES} value-tag)
+      (let [s (String. (.readBytes cursor nil))]
+        (if (.startsWith s ":")
+          (keyword (.substring s 1))
+          s))
+
+      (= value-tag Tag/UINT)
+      (.readUint cursor)
+
+      (= value-tag Tag/HASH_MAP)
+      (XITDBHashMap. (ReadHashMap. cursor))
+
+      (= value-tag Tag/ARRAY_LIST)
+      (XITDBArrayList. (ReadArrayList. cursor))
+
+      :else
+      nil)))

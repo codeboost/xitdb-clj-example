@@ -2,7 +2,7 @@
   (:import
     (clojure.lang Associative)
     [io.github.radarroark.xitdb
-     CoreFile CoreMemory Hasher Database
+     CoreFile CoreMemory Database$Float Database$Int Hasher Database
      Database$ContextFunction Database$Bytes Database$Uint
      RandomAccessMemory WriteArrayList WriteHashMap
      ReadArrayList ReadLinkedArrayList ReadHashMap Tag
@@ -17,42 +17,52 @@
 (declare coll->WriteArrayList!)
 
 (defn coll->WriteArrayList! [cursor coll]
-  (println "writing array list: " coll)
-  (let [cursor (WriteArrayList. cursor)]
+  (let [write-array (WriteArrayList. cursor)]
     (doseq [v coll]
       (cond
         (map? v)
-        (let [v-cursor (.appendCursor cursor)]
+        (let [v-cursor (.appendCursor write-array)]
           (map->WriteHashMap! v-cursor v))
 
         (string? v)
-        (.append cursor (Database$Bytes. v))
+        (.append write-array (Database$Bytes. v))
 
         (keyword? v)
-        (.append cursor (Database$Bytes. (str v)))
+        (.append write-array (Database$Bytes. (str v)))
 
         (integer? v)
-        (.append cursor (Database$Uint. v))
+        (.append write-array (Database$Uint. v))
 
         (sequential? v)
-        (let [v-cursor (.appendCursor cursor)]
+        (let [v-cursor (.appendCursor write-array)]
           (coll->WriteArrayList! v-cursor v))
 
         (boolean? v)
-        (.append cursor (Database$Uint. (if v 1 0)))
+        (.append write-array (Database$Uint. (if v 1 0)))
 
         (instance? Database$Bytes v)
-        (.append cursor v)
+        (.append write-array v)
 
         (instance? Database$Uint v)
-        (.append cursor v)
+        (.append write-array v)
 
         :else
-        (throw (IllegalArgumentException. (str "Unsupported type: " (type v)))))))
-  cursor)
+        (throw (IllegalArgumentException. (str "Unsupported type: " (type v))))))
+    (.-cursor write-array)))
 
-(defn value-for [v]
+(defn value-for [cursor v]
   (cond
+
+    (map? v)
+    (do
+      (.write cursor nil) ;; if there's anything, we clear it
+      (.slot (map->WriteHashMap! cursor v)))
+
+    (sequential? v)
+    (do
+      (.write cursor nil)
+      (.slot (coll->WriteArrayList! cursor v)))
+
     (string? v)
     (Database$Bytes. v)
 
@@ -68,56 +78,74 @@
     :else
     (throw (IllegalArgumentException. (str "Unsupported type: " (type v))))))
 
-(defn assoc-value [cursor k v]
+(defn assoc-value [whm k v]
   (let [k (str k)]
-
-    (.putKey cursor k (Database$Bytes. k))
 
     (cond
       (map? v)
-      (let [v-cursor (.putCursor cursor k)]
+      (let [v-cursor (.putCursor whm k)]
         (map->WriteHashMap! v-cursor v))
 
       (sequential? v)
-      (let [v-cursor (.putCursor cursor k)]
+      (let [v-cursor (.putCursor whm k)]
         (coll->WriteArrayList! v-cursor v))
 
       (string? v)
-      (.put cursor k (Database$Bytes. v))
+      (.put whm k (Database$Bytes. v))
 
       (keyword? v)
-      (.put cursor k (Database$Bytes. (str v)))
+      (.put whm k (Database$Bytes. (str v)))
 
       (integer? v)
-      (.put cursor k (Database$Uint. v))
+      (.put whm k (Database$Int. v))
+
+      (float? v)
+      (.put whm k (Database$Float. v))
 
       (boolean? v)
-      (.put cursor k (Database$Uint. (if v 1 0)))
+      (.put whm k (Database$Uint. (if v 1 0)))
 
       :else
       (throw (IllegalArgumentException. (str "Unsupported type: " (type v)))))))
 
+(defn writer-obj [cursor]
+  (let [tag (-> cursor .slot .tag)]
+    (cond
+      (contains? #{Tag/NONE Tag/HASH_MAP} tag)
+      (WriteHashMap. cursor)
+
+      (= tag Tag/ARRAY_LIST)
+      (WriteArrayList. cursor))))
 
 (defn keypath-cursor [cursor ks]
   (loop [ks ks
          cursor cursor]
-    (let [key (first ks)]
-      (println "key:" key)
-      (if (and cursor key)
-        (recur (next ks) (.putCursor cursor (str key)))
+    (let [key (first ks)
+          tag (-> cursor .slot .tag)]
+      (if key
+        (cond
+          (contains? #{Tag/NONE Tag/HASH_MAP} tag)
+          (recur (next ks) (.putCursor (WriteHashMap. cursor) (str key)))
+
+          (= tag Tag/ARRAY_LIST)
+          (recur (next ks) (let [array-list (WriteArrayList. cursor)]
+                             (if (= key (.count array-list))
+                               (.appendCursor array-list)
+                               (.putCursor array-list key))))
+
+          :else
+          (throw (IllegalArgumentException. (str "Unsupported type: " tag))))
         cursor))))
 
 (defn xitdb-assoc-in [cursor ks v]
-  (let [write-cursor (keypath-cursor cursor (butlast ks))
-        whm (WriteHashMap. write-cursor)]
-    (assoc-value whm (last ks) v)))
+  (let [cursor (keypath-cursor cursor ks)]
+    (.write cursor (value-for cursor v))))
 
 (defn map->WriteHashMap! [cursor m]
-  (println "Writing hashmap: " m)
-  (let [cursor (WriteHashMap. cursor)]
+  (let [whm (WriteHashMap. cursor)]
     (doseq [[k v] m]
-      (assoc-value cursor k v)))
-  cursor)
+      (assoc-value whm k v))
+    (.-cursor whm)))
 
 (defn WriteHashMap->map [cursor])
 

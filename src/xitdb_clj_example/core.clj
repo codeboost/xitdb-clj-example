@@ -63,5 +63,44 @@
         (is (= Tag/ARRAY_LIST (-> moment (.getCursor "people") .slot .tag)))
         (is (= Tag/HASH_MAP (-> moment (.getCursor "people") ReadArrayList. (.getCursor 1) .slot .tag)))
         ;; byte arrays <= 8 are SHORT_BYTES, so you should check for either type like this
-        (is (contains? #{Tag/SHORT_BYTES Tag/BYTES} (-> foo-cursor .slot .tag)))))))
+        (is (contains? #{Tag/SHORT_BYTES Tag/BYTES} (-> foo-cursor .slot .tag))))
+
+
+      (.appendContext history
+                      (.getSlot history -1)
+                      (reify Database$ContextFunction
+                        (^void run [this ^WriteCursor cursor]
+
+                          (let [array (WriteArrayList. cursor)]
+                            (doto array
+                              (.append (Database$Bytes. "foo"))))))))))
+
+
+(defn test-2 []
+  (with-open [ra (RandomAccessMemory.)]
+    (let [core (CoreMemory. ra)
+          hasher (Hasher. (java.security.MessageDigest/getInstance "SHA-1"))
+          db (Database. core hasher)
+          history (WriteArrayList. (.rootCursor db))]
+      ;; create new transaction to write data
+      (.appendContext history
+                      (.getSlot history -1)
+                      (reify Database$ContextFunction
+                        (^void run [this ^WriteCursor cursor]
+                          (let [moment (WriteHashMap. cursor)
+                                fruits (WriteArrayList. (.putCursor moment "fruits"))
+                                people (WriteArrayList. (.putCursor moment "people"))]
+                            (.put moment "foo" (Database$Bytes. "bar"))))))
+
+      (.appendContext history
+                      nil
+                      (reify Database$ContextFunction
+                        (^void run [this ^WriteCursor cursor]
+                          (let [moment (WriteHashMap. cursor)
+                                settings (WriteHashMap. (.putCursor moment "settings"))])))))))
+
+
+
+
+
 
