@@ -5,7 +5,7 @@
   (:import
     (clojure.lang Associative IReduceInit)
     [io.github.radarroark.xitdb
-     CoreFile CoreMemory Hasher Database
+     CoreFile CoreMemory Database$KeyNotFoundException Hasher Database
      Database$ContextFunction Database$Bytes Database$Uint
      RandomAccessMemory WriteArrayList WriteHashMap
      ReadArrayList ReadLinkedArrayList ReadHashMap Tag
@@ -13,15 +13,15 @@
     [java.io File RandomAccessFile]
     [java.security MessageDigest]))
 
-(declare read-from-cursor)
+(declare read-from-cursor unwrap)
 
 (deftype XITDBWriteArrayList [wal]
   clojure.lang.IPersistentCollection
   (count [this]
-    (.length wal))
+    (.count wal))
 
   (cons [this o]
-    (util/array-list-assoc-value wal (.count wal) o)
+    (util/array-list-assoc-value wal (.count wal) (unwrap o))
     this)
 
   (empty [this]
@@ -40,22 +40,22 @@
 
   (nth [this i not-found]
     (try
-      (if (and (>= i 0) (< i (.length wal)))
-        (read-from-cursor (.getCursor wal i))
+      (if (and (>= i 0) (< i (.count wal)))
+        (read-from-cursor (.putCursor wal i))
         not-found)
-      (catch Exception _ not-found)))
+      (catch Database$KeyNotFoundException _ not-found)))
 
   clojure.lang.Associative
   (assoc [this k v]
     (when-not (integer? k)
       (throw (IllegalArgumentException. "Key must be integer")))
-    (util/array-list-assoc-value wal k v)
+    (util/array-list-assoc-value wal k (unwrap v))
     this)
 
   (containsKey [this k]
     (try
-      (and (integer? k) (>= k 0) (< k (.length wal)))
-      (catch Exception _ false)))
+      (and (integer? k) (>= k 0) (< k (.count wal)))
+      (catch Database$KeyNotFoundException _ false)))
 
   (entryAt [this k]
     (when (.containsKey this k)
@@ -70,8 +70,8 @@
 
   clojure.lang.Seqable
   (seq [this]
-    (when (> (.length wal) 0)
-      (map #(.valAt this %) (range (.length wal)))))
+    (when (> (.count wal) 0)
+      (map #(.valAt this %) (range (.count wal)))))
 
   Object
   (toString [this]
@@ -80,16 +80,16 @@
 (deftype XITDBWriteHashMap [whm]
   clojure.lang.Associative
   (assoc [this k v]
-    (util/map-assoc-value whm k v)
+    (util/map-assoc-value whm k (unwrap v))
     this)
 
   (containsKey [this key]
     (try
-      (not (nil? (.getCursor whm (str key))))
-      (catch Exception _ false)))
+      (not (nil? (.putCursor whm (str key))))
+      (catch Database$KeyNotFoundException _ false)))
 
   (entryAt [this key]
-    (let [cursor (.getCursor whm (str key))]
+    (let [cursor (.putCursor whm (str key))]
       (when (some? cursor)
         (clojure.lang.MapEntry. key (read-from-cursor cursor)))))
 
@@ -104,7 +104,7 @@
 
   (valAt [this key not-found]
     (try
-      (let [cursor (.getCursor whm (str key))]
+      (let [cursor (.putCursor whm (str key))]
         (if (nil? cursor)
           not-found
           (read-from-cursor cursor)))
@@ -134,3 +134,14 @@
 
       :else
       nil)))
+
+(defn unwrap [v]
+  (cond
+    (instance? XITDBWriteArrayList v)
+    (.-wal v)
+
+    (instance? XITDBWriteHashMap v)
+    (.-whm v)
+
+    :else
+    v))

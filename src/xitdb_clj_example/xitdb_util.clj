@@ -63,6 +63,13 @@
 
 (defn value-for! [cursor v]
   (cond
+
+    (instance? WriteArrayList v)
+    (-> v .-cursor .slot)
+
+    (instance? WriteHashMap v)
+    (-> v .-cursor .slot)
+
     (map? v)
     (do
       (when-not (= Tag/HASH_MAP (-> cursor .slot .tag))
@@ -97,22 +104,10 @@
     (.write cursor (value-for! cursor v))))
 
 (defn map->WriteHashMap! [cursor m]
-  (cond
-    (contains? #{Tag/NONE Tag/HASH_MAP} (-> cursor .slot .tag))
-    (let [whm (WriteHashMap. cursor)]
-      (doseq [[k v] m]
-        (map-assoc-value whm k v))
-      (.-cursor whm))
-
-    (= Tag/ARRAY_LIST (-> cursor .slot .tag))
-    (let [wal (WriteArrayList. cursor)
-          [k v] (first m)]
-      (assert (nil? (second m))) ;; only one key-val pair
-      (array-list-assoc-value wal k v)
-      (.-cursor wal))
-
-    :else
-    (throw (IllegalArgumentException.))))
+  (let [whm (WriteHashMap. cursor)]
+    (doseq [[k v] m]
+      (map-assoc-value whm k v))
+    (.-cursor whm)))
 
 
 
