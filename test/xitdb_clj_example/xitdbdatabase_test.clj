@@ -53,13 +53,6 @@
       (swap! db assoc-in [4] 5)
       (is (= [1 20 3 4 5] (materialize @db))))))
 
-(comment
-  (let [db (xdb/xit-db :memory)]
-    (testing "Replacing data types"
-      (reset! db {:foo {:bar [1 2 3]}})
-      (swap! db assoc-in [:foo :bar] {:nested "map"})
-      (is (= {:foo {:bar {:nested "map"}}} (materialize @db))))))
-
 (deftest map-corner-cases-test
   (let [db (xdb/xit-db :memory)]
 
@@ -69,13 +62,11 @@
       (swap! db assoc-in [:foo] "bar")
       (is (= {:foo "bar"} (materialize @db))))
 
-
     (testing "Nested empty collections"
       (reset! db {:empty-map {} :empty-vec []})
       (is (= {:empty-map {} :empty-vec []} (materialize @db)))
       (swap! db assoc-in [:empty-map :key] "value")
       (is (= {:empty-map {:key "value"} :empty-vec []} (materialize @db))))
-
 
     (testing "Special keys"
       (reset! db {})
@@ -125,7 +116,6 @@
       (swap! db assoc-in [:users "1" :age] 44)
       (materialize @db)
       (is (= {:users {"1" {:name "john" :age 44}}} (materialize @db))))
-
 
     (testing "dissoc"
       (reset! db {:users {"1" {:name "john"}}})
@@ -177,8 +167,8 @@
       (reset! db [1 2 {:users [{:name "jp"}
                                {:name "cj"}]} 3 4])
       (swap! db assoc-in [2 :users 1 :name] "maria")
-      #_(is (= [1 2 {:users [{:name "jp"} {:name "maria"}]} 3 4]
-               (materialize @db)))
+      (is (= [1 2 {:users [{:name "jp"} {:name "maria"}]} 3 4]
+             (materialize @db)))
       @db)))
 
 #_(deftest SwapMerge

@@ -8,13 +8,16 @@
 (defn print-tag [tag]
   (cond
     (= tag Tag/NONE) :none
+    (= tag Tag/INDEX) :index
     (= tag Tag/ARRAY_LIST) :array-list
+    (= tag Tag/LINKED_ARRAY_LIST) :linked-array-list
     (= tag Tag/HASH_MAP) :hash-map
+    (= tag Tag/KV_PAIR) :kv-pair
     (= tag Tag/BYTES) :bytes
+    (= tag Tag/SHORT_BYTES) :short-bytes
+    (= tag Tag/UINT) :uint
     (= tag Tag/INT) :int
     (= tag Tag/FLOAT) :float
-    (= tag Tag/UINT) :uint
-    (= tag Tag/SHORT_BYTES) :short-bytes
     :else :unknown))
 
 (declare map->WriteHashMap!)
