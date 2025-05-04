@@ -10,6 +10,17 @@
     [java.io File RandomAccessFile]
     [java.security MessageDigest]))
 
+(defn print-tag [tag]
+  (cond
+    (= tag Tag/NONE) :none
+    (= tag Tag/ARRAY_LIST) :array-list
+    (= tag Tag/HASH_MAP) :hash-map
+    (= tag Tag/BYTES) :bytes
+    (= tag Tag/INT) :int
+    (= tag Tag/FLOAT) :float
+    (= tag Tag/UINT) :uint
+    (= tag Tag/SHORT_BYTES) :short-bytes
+    :else :unknown))
 
 (defonce MAX_READ_BYTES 1024)
 
@@ -72,17 +83,18 @@
     :else
     (throw (IllegalArgumentException. (str "Unsupported type: " (type v))))))
 
-(defn value-for! [cursor v & [keep?]]
+(defn value-for! [cursor v]
+
   (cond
     (map? v)
     (do
-      (when-not keep?
-        (.write cursor nil)) ;; if there's anything, we clear it
+      (when-not (= Tag/HASH_MAP (-> cursor .slot .tag))
+        (.write cursor nil))
       (.slot (map->WriteHashMap! cursor v)))
 
     (coll? v)
     (do
-      (when-not keep?
+      (when-not (= Tag/ARRAY_LIST (-> cursor .slot .tag))
         (.write cursor nil))
       (.slot (coll->WriteArrayList! cursor v)))
     :else
@@ -93,36 +105,14 @@
     (throw (IllegalArgumentException. "Index out of bounds")))
 
   (if (= i (.count wal))
-    (.append wal (value-for! (.cursor wal) v true))
+    (.append wal (value-for! (.cursor wal) v))
     (let [cursor (.putCursor wal i)]
-      (.write cursor (value-for! cursor v true)))))
+      (.write cursor (value-for! cursor v)))))
 
 (defn assoc-value [whm k v]
-
   (let [k (str k)
         cursor (.putCursor whm k)]
-    (.write cursor (value-for! cursor v true))
-
-    #_(cond
-        (map? v)
-        (let [v-cursor (.putCursor whm k)]
-          (map->WriteHashMap! v-cursor v))
-
-        (sequential? v)
-        (let [v-cursor (.putCursor whm k)]
-          (coll->WriteArrayList! v-cursor v))
-
-        :else
-        (.put whm k (primitive-for v)))))
-
-(defn writer-obj [cursor]
-  (let [tag (-> cursor .slot .tag)]
-    (cond
-      (contains? #{Tag/NONE Tag/HASH_MAP} tag)
-      (WriteHashMap. cursor)
-
-      (= tag Tag/ARRAY_LIST)
-      (WriteArrayList. cursor))))
+    (.write cursor (value-for! cursor v))))
 
 (defn keypath-cursor [cursor ks]
   (loop [ks ks
@@ -148,23 +138,35 @@
   (let [cursor (keypath-cursor cursor ks)]
     (.write cursor (value-for! cursor v))))
 
+
+
 (defn map->WriteHashMap! [cursor m]
-  (cond
-    (contains? #{Tag/NONE Tag/HASH_MAP} (-> cursor .slot .tag))
-    (let [whm (WriteHashMap. cursor)]
-      (doseq [[k v] m]
-        (assoc-value whm k v))
-      (.-cursor whm))
+  (let [tag (-> cursor .slot .tag)]
+    (cond
+      (map? m)
+      (when-not (contains? #{Tag/NONE Tag/HASH_MAP} tag)
+        (.write cursor nil))
 
-    (= Tag/ARRAY_LIST (-> cursor .slot .tag))
-    (let [wal (WriteArrayList. cursor)
-          [k v] (first m)]
-      (assert (nil? (second m))) ;; only one key-val pair
-      (array-list-assoc-value wal k v)
-      (.-cursor wal))
+      (coll? m)
+      (when-not (= Tag/ARRAY_LIST tag)
+        (.write cursor nil)))
 
-    :else
-    (throw (IllegalArgumentException.))))
+    (cond
+      (contains? #{Tag/NONE Tag/HASH_MAP} (-> cursor .slot .tag))
+      (let [whm (WriteHashMap. cursor)]
+        (doseq [[k v] m]
+          (assoc-value whm k v))
+        (.-cursor whm))
+
+      (= Tag/ARRAY_LIST (-> cursor .slot .tag))
+      (let [wal (WriteArrayList. cursor)
+            [k v] (first m)]
+        (assert (nil? (second m))) ;; only one key-val pair
+        (array-list-assoc-value wal k v)
+        (.-cursor wal))
+
+      :else
+      (throw (IllegalArgumentException.)))))
 
 (defn WriteHashMap->map [cursor])
 
