@@ -80,7 +80,7 @@
 (deftype XITDBWriteHashMap [whm]
   clojure.lang.Associative
   (assoc [this k v]
-    (util/assoc-value whm k v)
+    (util/map-assoc-value whm k v)
     this)
 
   (containsKey [this key]

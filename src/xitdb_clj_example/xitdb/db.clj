@@ -116,9 +116,5 @@
 (defn xit-db [filename]
   (->XITDBDatabase (open-database filename)))
 
-(defn xitdb-assoc-in! [db k v]
-  (let [history (history db)]
-    (append-context history (fn [cursor]
-                              (util/xitdb-assoc-in cursor k v)))))
 
 

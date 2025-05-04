@@ -46,11 +46,11 @@
       (is (= 3 (get @db 2)))
 
       ;; Test updating an element
-      (xdb/xitdb-assoc-in! db [1] 20)
+      (swap! db assoc-in [1] 20)
       (is (= [1 20 3 4] (materialize @db)))
 
       ;; Test adding elements
-      (xdb/xitdb-assoc-in! db [4] 5)
+      (swap! db assoc-in [4] 5)
       (is (= [1 20 3 4 5] (materialize @db))))))
 
 (comment
