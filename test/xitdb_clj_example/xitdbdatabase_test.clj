@@ -18,7 +18,7 @@
       (swap! db assoc-in [:foo :bar :some] [1 2 3 4])
       (is (= {:foo {:bar {:some [1 2 3 4]}}} @db))
 
-      (is (tu/db-qual-to-atom? db)))))
+      (is (tu/db-equal-to-atom? db)))))
 
 (deftest array-reset-test
   (let [db (tu/test-memory-db)]
@@ -37,7 +37,7 @@
       ;; Test adding elements
       (swap! db assoc-in [4] 5)
       (is (= [1 20 3 4 5] @db))
-      (is (tu/db-qual-to-atom? db)))))
+      (is (tu/db-equal-to-atom? db)))))
 
 (deftest map-corner-cases-test
   (let [db (tu/test-memory-db)]
@@ -81,7 +81,7 @@
       (is (= {"1" "numeric" "true" "boolean"} @db)))
 
     ;;This fails because keys are strings
-    #_(is (tu/db-qual-to-atom? db))))
+    #_(is (tu/db-equal-to-atom? db))))
 
 (deftest SwapTest
   (let [db (tu/test-memory-db)]
@@ -116,7 +116,7 @@
       (reset! db {:users {"1" {:name "john"}}})
       (swap! db dissoc :users)
       (is (= {} @db)))
-    (is (tu/db-qual-to-atom? db))))
+    (is (tu/db-equal-to-atom? db))))
 
 (deftest SwapArray
   (let [db (tu/test-memory-db)]
@@ -154,7 +154,7 @@
       (swap! db update-in [2] butlast)
       (is (= [1 2 [{:name "jp"}] 3 4] @db)))
 
-    (is (tu/db-qual-to-atom? db))))
+    (is (tu/db-equal-to-atom? db))))
 
 (deftest AssocInTest
   (let [db (tu/test-memory-db)]
@@ -164,7 +164,7 @@
       (swap! db assoc-in [2 :users 1 :name] "maria")
       (is (= [1 2 {:users [{:name "jp"} {:name "maria"}]} 3 4]
              @db))
-      (is (tu/db-qual-to-atom? db)))))
+      (is (tu/db-equal-to-atom? db)))))
 
 (deftest MergeTest
   (let [db (tu/test-memory-db)]
@@ -184,10 +184,15 @@
             "3" {:name "maria"}
             :foo [:bar]}
            @db))
-    (is (tu/db-qual-to-atom? db))))
+    (is (tu/db-equal-to-atom? db))))
 
 (deftest IntoTest
   (let [db (tu/test-memory-db)]
-    (reset! db {"1" {:name "jp"}
-                "2" {:name "cj"}})
-    @db))
+    (reset! db {"1" {:name "jp"} "2" {:name "cj"}})
+    (swap! db into [[:foo :bar]])
+    (is (= {"1" {:name "jp"} "2" {:name "cj"} :foo :bar} @db))
+
+    (reset! db [])
+    (swap! db into {:one :two})
+    (is (= [[:one :two]] @db))
+    (is (tu/db-equal-to-atom? db))))

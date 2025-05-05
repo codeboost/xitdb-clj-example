@@ -22,11 +22,11 @@
     v))
 
 (defprotocol DbEqualToAtom
-  (db-qual-to-atom? [this]))
+  (db-equal-to-atom? [this]))
 
 (deftype DBWithAtom [db test-atom]
   DbEqualToAtom
-  (db-qual-to-atom? [this]
+  (db-equal-to-atom? [this]
     (= (materialize @db) @test-atom))
 
 
@@ -62,3 +62,9 @@
 
 (defn test-memory-db []
   (instrumented-db (xdb/xit-db :memory)))
+
+(defn test-memory-db-raw []
+  (xdb/xit-db :memory))
+
+(defn test-memory-db-a []
+  (instrumented-db (atom nil)))
