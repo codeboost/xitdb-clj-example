@@ -155,8 +155,10 @@
   (without [_ _]
     (throw (UnsupportedOperationException. "XITDBHashMap is read-only")))
 
-  (count [_]
-    (.count rhm))
+  (count [this]
+    (if (= Tag/HASH_MAP (-> rhm .cursor .slot .tag))
+      (count (keys this))
+      (.count (.cursor rhm))))
 
   clojure.lang.IPersistentCollection
   (cons [_ _]

@@ -39,11 +39,9 @@
     (.nth this i nil))
 
   (nth [this i not-found]
-    (try
-      (if (and (>= i 0) (< i (.count wal)))
-        (read-from-cursor (.putCursor wal i))
-        not-found)
-      (catch Database$KeyNotFoundException _ not-found)))
+    (if (and (>= i 0) (< i (.count wal)))
+      (read-from-cursor (.putCursor wal i))
+      not-found))
 
   clojure.lang.Associative
   (assoc [this k v]
@@ -53,9 +51,7 @@
     this)
 
   (containsKey [this k]
-    (try
-      (and (integer? k) (>= k 0) (< k (.count wal)))
-      (catch Database$KeyNotFoundException _ false)))
+    (and (integer? k) (>= k 0) (< k (.count wal))))
 
   (entryAt [this k]
     (when (.containsKey this k)
@@ -84,9 +80,7 @@
     this)
 
   (containsKey [this key]
-    (try
-      (not (nil? (.putCursor whm (str key))))
-      (catch Database$KeyNotFoundException _ false)))
+    (not (nil? (.putCursor whm (str key)))))
 
   (entryAt [this key]
     (let [cursor (.putCursor whm (str key))]
@@ -103,12 +97,10 @@
     (.valAt this key nil))
 
   (valAt [this key not-found]
-    (try
-      (let [cursor (.putCursor whm (str key))]
-        (if (nil? cursor)
-          not-found
-          (read-from-cursor cursor)))
-      (catch Exception _ not-found)))
+    (let [cursor (.putCursor whm (str key))]
+      (if (nil? cursor)
+        not-found
+        (read-from-cursor cursor))))
 
   Object
   (toString [this]

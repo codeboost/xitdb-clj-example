@@ -158,7 +158,18 @@
                                {:name "cj"}]} 3 4])
       (swap! db update-in [2 :users] conj {:name "fl"})
       (is (= [1 2 {:users [{:name "jp"} {:name "cj"} {:name "fl"}]} 3 4]
-             (materialize @db))))))
+             (materialize @db))))
+
+    (testing "update-in array"
+      (reset! db [1 2 [{:name "jp"} {:name "cj"}] 3 4])
+      (swap! db update-in [2 1 :name ] str "-foo")
+      (is (= [1 2 [{:name "jp"} {:name "cj-foo"}] 3 4] (materialize @db)))
+      (swap! db update-in [2 1] dissoc :name)
+      (is (= [1 2 [{:name "jp"} {}] 3 4] (materialize @db)))
+      #_(swap! db update-in [2] (fn [a]
+                                  (println "a=" a)
+                                  (vec (butlast a))))
+      #_(materialize @db))))
 
 
 (deftest AssocInTest

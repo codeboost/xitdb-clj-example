@@ -98,8 +98,6 @@
                  (.putCursor wal i))]
     (.write cursor (value-for! cursor v))))
 
-
-
 (defn map-assoc-value [whm k v]
   (let [k (str k)
         cursor (.putCursor whm k)]
