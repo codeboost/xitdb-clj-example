@@ -80,6 +80,31 @@
 
 
 (deftype XITDBWriteHashMap [whm]
+  clojure.lang.IPersistentCollection
+  (cons [this o]
+
+    (cond
+      (instance? clojure.lang.MapEntry o)
+      (.assoc this (key o) (val o))
+
+      (map? o)
+      (let [[k v] (first o)]
+        (.assoc this k v))
+
+      (and (sequential? o) (= 2 (count o)))
+      (.assoc this (first o) (second o))
+
+      :else
+      (throw (IllegalArgumentException. "Can only cons MapEntries or key-value pairs onto maps")))
+    this)
+
+  (empty [this]
+    (throw (IllegalArgumentException. "empty not implemented")))
+
+  (equiv [this other]
+    (and (= (count this) (count other))
+         (every? (fn [[k v]] (= v (get other k ::not-found)))
+                 (seq this))))
   clojure.lang.Associative
   (assoc [this k v]
     (util/map-assoc-value whm k (unwrap v))
