@@ -5,15 +5,14 @@
     [xitdb-clj-example.xitdb-write-types :as wtypes]
     [xitdb-clj-example.xitdb-util :as util])
   (:import
-    (clojure.lang Associative)
     [io.github.radarroark.xitdb
      CoreFile CoreMemory Hasher Database
-     Database$ContextFunction Database$Bytes Database$Uint
-     RandomAccessMemory WriteArrayList WriteHashMap
-     ReadArrayList ReadLinkedArrayList ReadHashMap Tag
+     Database$ContextFunction
+     RandomAccessMemory WriteArrayList WriteHashMap Tag
      WriteCursor]
     [java.io File RandomAccessFile]
-    [java.security MessageDigest]))
+    [java.security MessageDigest]
+    (xitdb_clj_example.xitdb_write_types XITDBWriteArrayList XITDBWriteHashMap)))
 
 (defn db-history [db]
   (WriteArrayList. (.rootCursor db)))
@@ -27,24 +26,13 @@
         (fn cursor)
         nil))))
 
-(defn v->xitdb! [cursor v]
-  (cond
-    (map? v)
-    (util/map->WriteHashMap! cursor v)
-
-    (sequential? v)
-    (util/coll->WriteArrayList! cursor v)
-
-    :else
-    (throw (IllegalArgumentException. (str "Value must be a map or a collection, not " (type v))))))
-
 (defn xitdb-reset! [history new-value]
   (.appendContext
     history
     nil
     (reify Database$ContextFunction
       (^void run [_ ^WriteCursor cursor]
-        (v->xitdb! cursor new-value)
+        (util/value-for! cursor new-value)
         nil))))
 
 (defn xitdb-read [history]
@@ -65,6 +53,16 @@
         file (.get field core-file)]
     (.close file)))
 
+(defn slot-for-type [cursor v]
+  (cond
+    (instance? XITDBWriteArrayList v)
+    (-> v .wal .cursor .slot)
+
+    (instance? XITDBWriteHashMap v)
+    (-> v .whm .cursor .slot)
+    :else
+    (util/value-for! cursor v)))
+
 (defn xitdb-swap! [db f & args]
   (let [history (db-history db)]
     (append-context history (fn [cursor]
@@ -75,7 +73,9 @@
 
                                           (= Tag/ARRAY_LIST tag)
                                           (wtypes/->XITDBWriteArrayList (WriteArrayList. cursor)))]
-                                (apply f (concat [obj] args)))))))
+                                (let [retval (apply f (concat [obj] args))]
+                                  (.write cursor
+                                    (slot-for-type cursor retval))))))))
 
 
 (defprotocol IHistory

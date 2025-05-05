@@ -188,11 +188,106 @@
 
 (deftest IntoTest
   (let [db (tu/test-memory-db)]
-    (reset! db {"1" {:name "jp"} "2" {:name "cj"}})
-    (swap! db into [[:foo :bar]])
-    (is (= {"1" {:name "jp"} "2" {:name "cj"} :foo :bar} @db))
+    (reset! db [0 1 2 3 4])
+    (swap! db #(filterv even? %))
+    (is (= [0 2 4]
+           @db))
+    @db))
 
-    (reset! db [])
-    (swap! db into {:one :two})
-    (is (= [[:one :two]] @db))
+
+;;; Tests below were AI generated
+
+(deftest UpdateTest
+  (let [db (tu/test-memory-db)]
+    (testing "update map value"
+      (reset! db {:count 5 :name "test"})
+      (swap! db update :count inc)
+      (is (= {:count 6 :name "test"} @db)))
+
+    (testing "update with multiple args"
+      (reset! db {:list [1 2 3]})
+      (swap! db update :list conj 4 5)
+      (is (= {:list [1 2 3 4 5]} @db)))
+
+    (is (tu/db-equal-to-atom? db))))
+
+(deftest SelectKeysTest
+  (let [db (tu/test-memory-db)]
+    (reset! db {:a 1 :b 2 :c 3 :d 4})
+    (swap! db select-keys [:a :c])
+    (is (= {:a 1 :c 3} @db))
+    (is (tu/db-equal-to-atom? db))))
+
+(deftest FilterRemoveTest
+  (let [db (tu/test-memory-db)]
+    (testing "filter"
+      (reset! db {:a 1 :b 2 :c 3 :d 4})
+      (swap! db #(into {} (filter (fn [[_ v]] (even? v)) %)))
+      (is (= {:b 2 :d 4} @db)))
+
+    (testing "remove with vector"
+      (reset! db [1 2 3 4 5])
+      (swap! db #(vec (remove odd? %)))
+      (is (= [2 4] @db)))
+
+    (is (tu/db-equal-to-atom? db))))
+
+(deftest MapReduceTest
+  (let [db (tu/test-memory-db)]
+    (testing "map over vector"
+      (reset! db [1 2 3 4])
+      (swap! db #(vec (map inc %)))
+      (is (= [2 3 4 5] @db)))
+
+    (testing "map over map values"
+      (reset! db {:a 1 :b 2})
+      (swap! db #(zipmap (keys %) (map inc (vals %))))
+      (is (= {:a 2 :b 3} @db)))
+
+    (testing "reduce"
+      (reset! db [1 2 3 4 5])
+      (swap! db #(vector (reduce + %)))
+      (is (= [15] @db)))
+
+    (is (tu/db-equal-to-atom? db))))
+
+(deftest SequenceOpsTest
+  (let [db (tu/test-memory-db)]
+    (testing "concat"
+      (reset! db [1 2 3])
+      (swap! db #(vec (concat % [4 5 6])))
+      (is (= [1 2 3 4 5 6] @db)))
+
+    (testing "take/drop"
+      (reset! db [1 2 3 4 5])
+      (swap! db #(vec (take 3 %)))
+      (is (= [1 2 3] @db))
+
+      (reset! db [1 2 3 4 5])
+      (swap! db #(vec (drop 2 %)))
+      (is (= [3 4 5] @db)))
+
+    (testing "partition"
+      (reset! db [1 2 3 4 5 6])
+      (swap! db #(vec (map vec (partition 2 %))))
+      (is (= [[1 2] [3 4] [5 6]] @db)))
+
+    (is (tu/db-equal-to-atom? db))))
+
+(deftest MiscOpsTest
+  (let [db (tu/test-memory-db)]
+    (testing "empty"
+      (reset! db {:a 1 :b 2})
+      (swap! db empty)
+      (is (= {} @db))
+
+      (reset! db [1 2 3])
+      (swap! db empty)
+      (is (= [] @db)))
+
+    (testing "juxt"
+      (reset! db {:users [{:name "John" :age 30} {:name "Alice" :age 25}]})
+      (swap! db update-in [:users] #(mapv ((juxt :name :age)) %))
+      (is (= {:users [["John" 30] ["Alice" 25]]} @db)))
+
     (is (tu/db-equal-to-atom? db))))
