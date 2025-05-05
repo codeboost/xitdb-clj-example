@@ -93,10 +93,12 @@
   (when (> i (.count wal))
     (throw (IllegalArgumentException. "Index out of bounds")))
 
-  (if (= i (.count wal))
-    (.append wal (value-for! (.cursor wal) v))
-    (let [cursor (.putCursor wal i)]
-      (.write cursor (value-for! cursor v)))))
+  (let [cursor (if (= i (.count wal))
+                 (.appendCursor wal)
+                 (.putCursor wal i))]
+    (.write cursor (value-for! cursor v))))
+
+
 
 (defn map-assoc-value [whm k v]
   (let [k (str k)
