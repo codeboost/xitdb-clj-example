@@ -99,8 +99,7 @@
     this)
 
   (empty [this]
-    #_(util/value-for! (-> whm .cursor) {})
-    this)
+    (throw (IllegalArgumentException. "empty not implemented")))
 
   (equiv [this other]
     (and (= (count this) (count other))
