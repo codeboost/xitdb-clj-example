@@ -166,11 +166,9 @@
       (is (= [1 2 [{:name "jp"} {:name "cj-foo"}] 3 4] (materialize @db)))
       (swap! db update-in [2 1] dissoc :name)
       (is (= [1 2 [{:name "jp"} {}] 3 4] (materialize @db)))
-      #_(swap! db update-in [2] (fn [a]
-                                  (println "a=" a)
-                                  (vec (butlast a))))
-      #_(materialize @db))))
-
+      (swap! db update-in [2] butlast)
+      (is (= [1 2 [{:name "jp"}] 3 4]
+             (materialize @db))))))
 
 (deftest AssocInTest
   (let [db (xdb/xit-db :memory)]

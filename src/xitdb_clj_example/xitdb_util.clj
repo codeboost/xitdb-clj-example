@@ -72,15 +72,12 @@
 
     (map? v)
     (do
-      (when-not (= Tag/HASH_MAP (-> cursor .slot .tag))
-        (.write cursor nil))
+      (.write cursor nil)
       (.slot (map->WriteHashMap! cursor v)))
 
     (coll? v)
     (do
-      (when-not (= Tag/ARRAY_LIST (-> cursor .slot .tag))
-        (.write cursor nil))
-
+      (.write cursor nil)
       (.slot (coll->WriteArrayList! cursor v)))
     :else
     (primitive-for v)))
@@ -108,6 +105,32 @@
     (doseq [[k v] m]
       (map-assoc-value whm k v))
     (.-cursor whm)))
+
+(defn has-key? [key-cursor]
+  ;;TODO: Can the key have other types ?
+  (contains? #{Tag/BYTES Tag/SHORT_BYTES} (-> key-cursor .slot .tag)))
+
+(defn map-seq
+  "Iterates through a ReadHashMap or WriteHashMap.
+  `read-from-cursor` is a function which reads the data and converts
+  it into the proper XITDBHashMap or XITDBWriteHashMap types."
+  [rhm read-from-cursor]
+  (let [iterator (.iterator rhm)]
+    (loop [entries []
+           has-next (.hasNext iterator)]
+      (if has-next
+        (let [cursor (.next iterator)
+              kv-pair (.readKeyValuePair cursor)
+              key-cursor (.-keyCursor kv-pair)]
+          (if (has-key? key-cursor)
+            (let [key (String. (.readBytes key-cursor nil))
+                  key (if (.startsWith key ":") (keyword (.substring key 1)) key)
+                  value-cursor (.-valueCursor kv-pair)
+                  value (read-from-cursor value-cursor)]
+              (recur (conj entries (clojure.lang.MapEntry. key value))
+                     (.hasNext iterator)))
+            (recur entries (.hasNext iterator))))
+        (seq entries)))))
 
 
 

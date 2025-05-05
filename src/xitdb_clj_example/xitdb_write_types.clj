@@ -21,6 +21,7 @@
     (.count wal))
 
   (cons [this o]
+    ;;TODO: Figure out if it is correct to append to the end
     (util/array-list-assoc-value wal (.count wal) (unwrap o))
     this)
 
@@ -40,7 +41,9 @@
 
   (nth [this i not-found]
     (if (and (>= i 0) (< i (.count wal)))
-      (read-from-cursor (.putCursor wal i))
+      (let [ret (read-from-cursor (.putCursor wal i))]
+        #_(println "read-from-cursor " i (count ret))
+        ret)
       not-found))
 
   clojure.lang.Associative
@@ -73,6 +76,9 @@
   (toString [this]
     (str "XITDBWriteArrayList")))
 
+;;---------------------------------------
+
+
 (deftype XITDBWriteHashMap [whm]
   clojure.lang.Associative
   (assoc [this k v]
@@ -92,15 +98,27 @@
     (.remove whm (str k))
     this)
 
+  (count [this]
+    (let [iter (.iterator whm)]
+      (loop [count 0]
+        (if (.hasNext iter)
+          (do (.next iter) (recur (inc count)))
+          count))))
+
+
   clojure.lang.ILookup
   (valAt [this key]
     (.valAt this key nil))
 
   (valAt [this key not-found]
-    (let [cursor (.putCursor whm (str key))]
+    (let [cursor (.getCursor whm (str key))]
       (if (nil? cursor)
         not-found
-        (read-from-cursor cursor))))
+        (read-from-cursor (.putCursor whm (str key))))))
+
+  clojure.lang.Seqable
+  (seq [this]
+    (util/map-seq whm read-from-cursor))
 
   Object
   (toString [this]
@@ -108,6 +126,7 @@
 
 (defn read-from-cursor [cursor]
   (let [value-tag (some-> cursor .slot .tag)]
+    #_(println "value-tag:" (util/print-tag value-tag))
     (cond
       (contains? #{Tag/SHORT_BYTES Tag/BYTES} value-tag)
       (let [s (String. (.readBytes cursor nil))]

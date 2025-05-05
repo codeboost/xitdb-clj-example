@@ -156,9 +156,11 @@
     (throw (UnsupportedOperationException. "XITDBHashMap is read-only")))
 
   (count [this]
-    (if (= Tag/HASH_MAP (-> rhm .cursor .slot .tag))
-      (count (keys this))
-      (.count (.cursor rhm))))
+    (let [iter (.iterator rhm)]
+      (loop [count 0]
+        (if (.hasNext iter)
+          (do (.next iter) (recur (inc count)))
+          count))))
 
   clojure.lang.IPersistentCollection
   (cons [_ _]
@@ -173,23 +175,7 @@
 
   clojure.lang.Seqable
   (seq [this]
-    (let [iterator (.iterator rhm)]
-      (loop [entries []
-             has-next (.hasNext iterator)]
-        (if has-next
-          (let [cursor (.next iterator)
-                kv-pair (.readKeyValuePair cursor)
-                key-cursor (.-keyCursor kv-pair)]
-            (if (some? key-cursor)
-              (let [key (String. (.readBytes key-cursor nil))
-                    ;; ideally, the db should support it as a native type
-                    key (if (.startsWith key ":") (keyword (.substring key 1)) key)
-                    value-cursor (.-valueCursor kv-pair)
-                    value (read-from-cursor value-cursor)]
-                (recur (conj entries (clojure.lang.MapEntry. key value))
-                       (.hasNext iterator)))
-              (recur entries (.hasNext iterator))))
-          (seq entries)))))
+    (util/map-seq rhm read-from-cursor))
 
   clojure.lang.IFn
   (invoke [this k]
