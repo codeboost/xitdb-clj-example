@@ -76,12 +76,10 @@
       (reset! db {})
       (swap! db assoc-in [1] "numeric")
 
-      (is (= {"1" "numeric"} @db) "Keys are stringified")
+      (is (= {1 "numeric"} @db) "Keys are preserved")
       (swap! db assoc-in [true] "boolean")
-      (is (= {"1" "numeric" "true" "boolean"} @db)))
-
-    ;;This fails because keys are strings
-    #_(is (tu/db-equal-to-atom? db))))
+      (is (= {1 "numeric" true "boolean"} @db)))
+    (is (tu/db-equal-to-atom? db))))
 
 (deftest SwapTest
   (with-db [db (tu/test-db)]

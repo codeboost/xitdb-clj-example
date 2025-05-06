@@ -102,16 +102,16 @@
     this)
 
   (containsKey [this key]
-    (not (nil? (.putCursor whm (str key)))))
+    (not (nil? (.putCursor whm (util/key-primitive-for key)))))
 
   (entryAt [this key]
-    (let [cursor (.putCursor whm (str key))]
+    (let [cursor (.putCursor whm (util/key-primitive-for key))]
       (when (some? cursor)
         (clojure.lang.MapEntry. key (read-from-cursor cursor)))))
 
   clojure.lang.IPersistentMap
-  (without [this k]
-    (.remove whm (str k))
+  (without [this key]
+    (.remove whm (util/keyname key))
     this)
 
   (count [this]
@@ -127,10 +127,10 @@
     (.valAt this key nil))
 
   (valAt [this key not-found]
-    (let [cursor (.getCursor whm (str key))]
+    (let [cursor (.getCursor whm (util/keyname key))]
       (if (nil? cursor)
         not-found
-        (read-from-cursor (.putCursor whm (str key))))))
+        (read-from-cursor (.putCursor whm (util/key-primitive-for key))))))
 
   clojure.lang.Seqable
   (seq [this]
@@ -145,7 +145,7 @@
     #_(println "value-tag:" (util/xit-tag->keyword value-tag))
     (cond
       (contains? #{Tag/SHORT_BYTES Tag/BYTES} value-tag)
-      (util/string->maybe-keyword (String. (.readBytes cursor nil)))
+      (util/read-bytes-with-format-tag cursor)
 
       (= value-tag Tag/UINT)
       (.readUint cursor)

@@ -19,8 +19,20 @@
     (= tag Tag/FLOAT) :float
     :else :unknown))
 
+(def fmt-tag-value
+  {:keyword "kw"
+   :boolean "bl"
+   :key-integer "ki"})
+
 (declare map->WriteHashMapCursor!)
 (declare coll->ArrayListCursor!)
+
+(defn keyname [key]
+  (if (keyword? key)
+    (if (namespace key)
+      (str (namespace key) "/" (name key))
+      (name key))
+    key))
 
 (defn primitive-for
   "Converts a Clojure primitive value to its corresponding XitDB representation.
@@ -33,14 +45,14 @@
     (Database$Bytes. ^String v)
 
     (keyword? v)
-    (Database$Bytes. (str v) "kw")
+    (Database$Bytes. (keyname v) (fmt-tag-value :keyword))
 
     ;;TODO: Database$Int doesn't work (stores null)
     (integer? v)
     (Database$Uint. v)
 
     (boolean? v)
-    (Database$Bytes. (if v "1" "0") "bl")
+    (Database$Bytes. (if v "#t" "#f") (fmt-tag-value :boolean))
 
     (float? v)
     (Database$Float. v)
@@ -92,17 +104,18 @@
                  (.putCursor wal i))]
     (.write cursor (v->slot! cursor v))))
 
-(defn ->hashmap-key
-  [k]
-  ;;TODO: support other types for hashmap keys ?
-  (str k))
+(defn key-primitive-for [k]
+  (cond
+    (integer? k)
+    (Database$Bytes. (str k) "ki")
+    :else
+    (primitive-for k)))
 
 (defn map-assoc-value!
   "Associates a key-value pair in a WriteHashMap.
   Converts the key to a string and the value to an appropriate XitDB representation."
   [whm k v]
-  (let [k (->hashmap-key k)
-        cursor (.putCursor whm k)]
+  (let [cursor (.putCursor whm (key-primitive-for k))]
     (.write cursor (v->slot! cursor v))))
 
 (defn coll->ArrayListCursor!
@@ -140,13 +153,22 @@
   ;;TODO: Can the key have other types ?
   (contains? #{Tag/BYTES Tag/SHORT_BYTES} (-> key-cursor .slot .tag)))
 
-(defn string->maybe-keyword
-  "Converts a string to a keyword if it starts with a colon.
-  Otherwise returns the original string."
-  [s]
-  (if (.startsWith s ":")
-    (keyword (.substring s 1))
-    s))
+(defn read-bytes-with-format-tag [cursor]
+  (let [bytes-obj (.readBytesObject cursor nil)
+        str (String. (.value bytes-obj))
+        fmt-tag (some-> bytes-obj .formatTag String.)]
+    (cond
+      (= fmt-tag (fmt-tag-value :keyword))
+      (keyword str)
+
+      (= fmt-tag (fmt-tag-value :boolean))
+      (= str "#t")
+
+      (= fmt-tag (fmt-tag-value :key-integer))
+      (Integer/parseInt str)
+
+      :else
+      str)))
 
 (defn map-seq
   "Iterates through a ReadHashMap or WriteHashMap.
@@ -161,8 +183,7 @@
               kv-pair (.readKeyValuePair cursor)
               key-cursor (.-keyCursor kv-pair)]
           (if (key-tag-valid? key-cursor)
-            (let [key (String. (.readBytes key-cursor nil))
-                  key (string->maybe-keyword key)
+            (let [key (read-bytes-with-format-tag key-cursor)
                   value-cursor (.-valueCursor kv-pair)
                   value (read-from-cursor value-cursor)]
               (recur (conj entries (clojure.lang.MapEntry. key value))
@@ -170,17 +191,6 @@
             (recur entries (.hasNext iterator))))
         (seq entries)))))
 
-(defn read-bytes [cursor]
-  (let [bytes-obj (.readBytesObject cursor)
-        str (String. (.value bytes-obj))
-        fmt-tag (String. (.formatTag bytes-obj))]
-    (cond
-      (= fmt-tag "kw")
-      (keyword str)
 
-      (= fmt-tag "bl")
-      (boolean (Integer/parseInt str))
-      :else
-      str)))
 
 
