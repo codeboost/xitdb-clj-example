@@ -29,6 +29,9 @@
   (db-equal-to-atom? [this]
     (= (materialize @db) @test-atom))
 
+  xdb/ICloseDB
+  (close-db! [this]
+    (xdb/close-db! db))
 
   clojure.lang.IDeref
   (deref [_]
@@ -55,16 +58,32 @@
     (apply swap! (concat [test-atom f x y] args))
     (apply swap! (concat [db f x y] args))))
 
-
 (defn instrumented-db [db]
   (let [a (atom nil)]
     (->DBWithAtom db a)))
 
-(defn test-memory-db []
-  (instrumented-db (xdb/xit-db :memory)))
+(def test-source :memory) ;; :memory or filename
+
+(defn test-db []
+  (instrumented-db (xdb/xit-db test-source)))
 
 (defn test-memory-db-raw []
   (xdb/xit-db :memory))
 
 (defn test-memory-db-a []
   (instrumented-db (atom nil)))
+
+(defmacro with-db
+  "Execute body with a database connection, then ensure database is closed.
+
+  Usage:
+  (with-db [db (xdb/open-db \"some.xdb\")]
+    ... code using db ...)"
+  [binding & body]
+  (let [db-name (first binding)
+        db-expr (second binding)]
+    `(let [~db-name ~db-expr]
+       (try
+         ~@body
+         (finally
+           (xdb/close-db! ~db-name))))))

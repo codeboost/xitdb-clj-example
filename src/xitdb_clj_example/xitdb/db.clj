@@ -46,13 +46,6 @@
         hasher (Hasher. (MessageDigest/getInstance "SHA-1"))]
     (Database. core hasher)))
 
-(defn close-db! [db]
-  (let [core-file (-> db .-db .-core)
-        field (.getDeclaredField CoreFile "file")
-        _ (.setAccessible field true)
-        file (.get field core-file)]
-    (.close file)))
-
 (defn slot-for-type [cursor v]
   (cond
     (instance? XITDBWriteArrayList v)
@@ -77,11 +70,26 @@
                                   (.write cursor
                                     (slot-for-type cursor retval))))))))
 
+(defn close-db-file! [db]
+  (let [core (-> db .-db .-core)]
+    (when (instance? CoreFile core)
+      ;;TODO: is this the best way to do it?
+      (let [field (.getDeclaredField CoreFile "file")
+            _ (.setAccessible field true)
+            file (.get field core)]
+        (.close file)))))
 
 (defprotocol IHistory
   (history [this]))
 
+(defprotocol ICloseDB
+  (close-db! [this]))
+
 (deftype XITDBDatabase [db]
+  ICloseDB
+  (close-db! [this]
+    (close-db-file! this))
+
   IHistory
   (history [this]
     (db-history db))

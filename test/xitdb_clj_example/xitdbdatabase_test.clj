@@ -1,10 +1,10 @@
 (ns xitdb-clj-example.xitdbdatabase-test
   (:require
     [clojure.test :refer :all]
-    [xitdb-clj-example.test-utils :as tu]))
+    [xitdb-clj-example.test-utils :as tu :refer [with-db]]))
 
 (deftest DatabaseTest
-  (let [db (tu/test-memory-db)]
+  (with-db [db (tu/test-db)]
     (testing "Resetting to map"
       (reset! db {:foo :bar})
       (is (= {:foo :bar} @db))
@@ -21,7 +21,7 @@
       (is (tu/db-equal-to-atom? db)))))
 
 (deftest array-reset-test
-  (let [db (tu/test-memory-db)]
+  (with-db [db (tu/test-db)]
     (testing "Resetting to array"
       ;; Start with a fresh database and reset to vector
       (reset! db [1 2 3 4])
@@ -40,7 +40,7 @@
       (is (tu/db-equal-to-atom? db)))))
 
 (deftest map-corner-cases-test
-  (let [db (tu/test-memory-db)]
+  (with-db [db (tu/test-db)]
 
     (testing "Empty map operations"
       (reset! db {})
@@ -84,7 +84,7 @@
     #_(is (tu/db-equal-to-atom? db))))
 
 (deftest SwapTest
-  (let [db (tu/test-memory-db)]
+  (with-db [db (tu/test-db)]
     (reset! db {:foo :bar})
     (is (= {:foo :bar} @db))
 
@@ -119,7 +119,7 @@
     (is (tu/db-equal-to-atom? db))))
 
 (deftest SwapArray
-  (let [db (tu/test-memory-db)]
+  (with-db [db (tu/test-db)]
     (testing "assoc"
       (reset! db [1 2 3])
       (swap! db #(assoc % 0 44))
@@ -157,7 +157,7 @@
     (is (tu/db-equal-to-atom? db))))
 
 (deftest AssocInTest
-  (let [db (tu/test-memory-db)]
+  (with-db [db (tu/test-db)]
     (testing "assoc-in more"
       (reset! db [1 2 {:users [{:name "jp"}
                                {:name "cj"}]} 3 4])
@@ -167,7 +167,7 @@
       (is (tu/db-equal-to-atom? db)))))
 
 (deftest MergeTest
-  (let [db (tu/test-memory-db)]
+  (with-db [db (tu/test-db)]
     (reset! db {"1" {:name "jp"}
                 "2" {:name "cj"}})
 
@@ -187,7 +187,7 @@
     (is (tu/db-equal-to-atom? db))))
 
 (deftest IntoTest
-  (let [db (tu/test-memory-db)]
+  (with-db [db (tu/test-db)]
     (reset! db [0 1 2 3 4])
     (swap! db #(filterv even? %))
     (is (= [0 2 4]
@@ -198,7 +198,7 @@
 ;;; Tests below were AI generated
 
 (deftest UpdateTest
-  (let [db (tu/test-memory-db)]
+  (with-db [db (tu/test-db)]
     (testing "update map value"
       (reset! db {:count 5 :name "test"})
       (swap! db update :count inc)
@@ -212,14 +212,14 @@
     (is (tu/db-equal-to-atom? db))))
 
 (deftest SelectKeysTest
-  (let [db (tu/test-memory-db)]
+  (with-db [db (tu/test-db)]
     (reset! db {:a 1 :b 2 :c 3 :d 4})
     (swap! db select-keys [:a :c])
     (is (= {:a 1 :c 3} @db))
     (is (tu/db-equal-to-atom? db))))
 
 (deftest FilterRemoveTest
-  (let [db (tu/test-memory-db)]
+  (with-db [db (tu/test-db)]
     (testing "filter"
       (reset! db {:a 1 :b 2 :c 3 :d 4})
       (swap! db #(into {} (filter (fn [[_ v]] (even? v)) %)))
@@ -233,7 +233,7 @@
     (is (tu/db-equal-to-atom? db))))
 
 (deftest MapReduceTest
-  (let [db (tu/test-memory-db)]
+  (with-db [db (tu/test-db)]
     (testing "map over vector"
       (reset! db [1 2 3 4])
       (swap! db #(vec (map inc %)))
@@ -252,7 +252,7 @@
     (is (tu/db-equal-to-atom? db))))
 
 (deftest SequenceOpsTest
-  (let [db (tu/test-memory-db)]
+  (with-db [db (tu/test-db)]
     (testing "concat"
       (reset! db [1 2 3])
       (swap! db #(vec (concat % [4 5 6])))
@@ -274,8 +274,9 @@
 
     (is (tu/db-equal-to-atom? db))))
 
+
 (deftest MiscOpsTest
-  (let [db (tu/test-memory-db)]
+  (with-db [db (tu/test-db)]
     (testing "empty"
       (reset! db {:a 1 :b 2})
       (swap! db empty)
