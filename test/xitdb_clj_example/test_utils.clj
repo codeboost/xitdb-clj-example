@@ -1,9 +1,9 @@
 (ns xitdb-clj-example.test-utils
   (:require
     [clojure.test :refer :all]
-    [xitdb-clj-example.xitdb.db :as xdb]
-    [xitdb-clj-example.xitdb-types :as types])
-  (:import (xitdb_clj_example.xitdb_types XITDBArrayList XITDBHashMap)))
+    [xitdb.db :as xdb]
+    [xitdb.xitdb-types :as types])
+  (:import (xitdb.xitdb_types XITDBArrayList XITDBHashMap)))
 
 
 (defn materialize

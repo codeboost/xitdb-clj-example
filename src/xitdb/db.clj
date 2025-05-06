@@ -1,18 +1,15 @@
-(ns xitdb-clj-example.xitdb.db
+(ns xitdb.db
   (:require
-    [xitdb-clj-example.xitdb-types :as xtypes]
+    [xitdb.xitdb-types :as xtypes]
 
-    [xitdb-clj-example.xitdb-write-types :as wtypes]
-    [xitdb-clj-example.xitdb-util :as util])
+    [xitdb.xitdb-write-types :as wtypes]
+    [xitdb.xitdb-util :as util])
   (:import
     [io.github.radarroark.xitdb
-     CoreFile CoreMemory Hasher Database
-     Database$ContextFunction
-     RandomAccessMemory WriteArrayList WriteHashMap Tag
-     WriteCursor]
+     CoreFile CoreMemory Hasher Database Database$ContextFunction
+     RandomAccessMemory WriteArrayList WriteHashMap Tag WriteCursor]
     [java.io File RandomAccessFile]
-    [java.security MessageDigest]
-    (xitdb_clj_example.xitdb_write_types XITDBWriteArrayList XITDBWriteHashMap)))
+    [java.security MessageDigest]))
 
 (defn db-history [db]
   (WriteArrayList. (.rootCursor db)))
@@ -42,15 +39,6 @@
         hasher (Hasher. (MessageDigest/getInstance "SHA-1"))]
     (Database. core hasher)))
 
-(defn slot-for-type [cursor v]
-  (cond
-    (instance? XITDBWriteArrayList v)
-    (-> v .wal .cursor .slot)
-
-    (instance? XITDBWriteHashMap v)
-    (-> v .whm .cursor .slot)
-    :else
-    (util/slot-for-value! cursor v)))
 
 (defn xitdb-swap! [db f & args]
   (let [history (db-history db)]
@@ -64,7 +52,7 @@
                                           (wtypes/->XITDBWriteArrayList (WriteArrayList. cursor)))]
                                 (let [retval (apply f (concat [obj] args))]
                                   (.write cursor
-                                    (slot-for-type cursor retval))))))))
+                                    (wtypes/slot-for-value! cursor retval))))))))
 
 (defn close-db-file! [db]
   (let [core (-> db .-db .-core)]

@@ -1,6 +1,6 @@
-(ns xitdb-clj-example.xitdb-write-types
+(ns xitdb.xitdb-write-types
   (:require
-    [xitdb-clj-example.xitdb-util :as util])
+    [xitdb.xitdb-util :as util])
   (:import
     (io.github.radarroark.xitdb Tag WriteArrayList WriteHashMap)))
 
@@ -169,3 +169,13 @@
 
     :else
     v))
+
+(defn slot-for-value! [cursor v]
+  (cond
+    (instance? XITDBWriteArrayList v)
+    (-> v .wal .cursor .slot)
+
+    (instance? XITDBWriteHashMap v)
+    (-> v .whm .cursor .slot)
+    :else
+    (util/slot-for-value! cursor v)))

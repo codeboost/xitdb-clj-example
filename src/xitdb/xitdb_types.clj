@@ -1,8 +1,8 @@
-(ns xitdb-clj-example.xitdb-types
+(ns xitdb.xitdb-types
   (:require
-    [xitdb-clj-example.xitdb-util :as util])
+    [xitdb.xitdb-util :as util])
   (:import
-    (io.github.radarroark.xitdb ReadArrayList ReadHashMap Tag)))
+    [io.github.radarroark.xitdb ReadArrayList ReadHashMap Tag]))
 
 (declare read-from-cursor)
 

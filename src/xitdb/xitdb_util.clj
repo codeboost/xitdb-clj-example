@@ -1,4 +1,4 @@
-(ns xitdb-clj-example.xitdb-util
+(ns xitdb.xitdb-util
   (:import
     [io.github.radarroark.xitdb Database$Float Database$Bytes Database$Uint WriteArrayList WriteHashMap Tag]))
 
