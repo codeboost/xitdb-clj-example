@@ -102,10 +102,10 @@
     this)
 
   (containsKey [this key]
-    (not (nil? (.putCursor whm (util/key-primitive-for key)))))
+    (not (nil? (.putCursor whm (util/write-key key)))))
 
   (entryAt [this key]
-    (let [cursor (.putCursor whm (util/key-primitive-for key))]
+    (let [cursor (.putCursor whm (util/write-key key))]
       (when (some? cursor)
         (clojure.lang.MapEntry. key (read-from-cursor cursor)))))
 
@@ -130,7 +130,7 @@
     (let [cursor (.getCursor whm (util/keyname key))]
       (if (nil? cursor)
         not-found
-        (read-from-cursor (.putCursor whm (util/key-primitive-for key))))))
+        (read-from-cursor (.putCursor whm (util/write-key key))))))
 
   clojure.lang.Seqable
   (seq [this]

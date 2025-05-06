@@ -104,10 +104,21 @@
                  (.putCursor wal i))]
     (.write cursor (v->slot! cursor v))))
 
-(defn key-primitive-for [k]
+(defn read-key
+  "Returns the key to be used in a ReadHashMap.getCursor(key) call."
+  [k]
   (cond
     (integer? k)
-    (Database$Bytes. (str k) "ki")
+    (str k) ;integer keys are stored as strings with 'ki' format tag
+    :else
+    (keyname k)))
+
+(defn write-key
+  "Returns the key to be written to the database by WriteHashMap.putCursor()."
+  [k]
+  (cond
+    (integer? k)
+    (Database$Bytes. (str k) "ki") ;integer keys are stored as strings with 'ki' format tag
     :else
     (primitive-for k)))
 
@@ -115,7 +126,7 @@
   "Associates a key-value pair in a WriteHashMap.
   Converts the key to a string and the value to an appropriate XitDB representation."
   [whm k v]
-  (let [cursor (.putCursor whm (key-primitive-for k))]
+  (let [cursor (.putCursor whm (write-key k))]
     (.write cursor (v->slot! cursor v))))
 
 (defn coll->ArrayListCursor!

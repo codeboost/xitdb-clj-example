@@ -20,6 +20,13 @@
 
       (is (tu/db-equal-to-atom? db)))))
 
+(deftest get-in-test
+  (with-db [db (tu/test-memory-db-raw)]
+    (reset! db {:foo {:bar :baz}})
+    (is (= :baz (get-in @db [:foo :bar])))
+    (reset! db {"foo" {:bar {1 :baz}}})
+    (is (= :baz (get-in @db ["foo" :bar 1])))))
+
 (deftest array-reset-test
   (with-db [db (tu/test-db)]
     (testing "Resetting to array"

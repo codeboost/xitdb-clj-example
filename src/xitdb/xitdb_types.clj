@@ -43,11 +43,8 @@
 
   clojure.lang.Indexed
   (nth [_ i]
-    (try
-      (let [cursor (.getCursor ral (long i))]
-        (read-from-cursor cursor))
-      (catch Exception e
-        (throw (RuntimeException. (str "Error getting item at index " i) e)))))
+    (let [cursor (.getCursor ral (long i))]
+      (read-from-cursor cursor)))
 
   (nth [_ i not-found]
     (try
@@ -121,33 +118,20 @@
   (print-method (into [] o) w))
 
 
-(defprotocol IDb
-  (db [this] "Returns the db handle"))
-
 (deftype XITDBHashMap [rhm]
-  IDb
-  (db [this]
-    (.-db (.-cursor rhm)))
-
   clojure.lang.ILookup
   (valAt [this key]
     (.valAt this key nil))
 
   (valAt [this key not-found]
-    (try
-      (let [cursor (.getCursor rhm (str key))]
-        (if (nil? cursor)
-          not-found
-          (read-from-cursor cursor)))
-      (catch Exception e
-        (println "Exception: " e)
-        not-found)))
+    (let [cursor (.getCursor rhm (util/read-key key))]
+      (if (nil? cursor)
+        not-found
+        (read-from-cursor cursor))))
 
   clojure.lang.Associative
   (containsKey [this key]
-    (try
-      (not (nil? (.getCursor rhm (str key))))
-      (catch Exception _ false)))
+    (not (nil? (.getCursor rhm (util/read-key key)))))
 
   (entryAt [this key]
     (let [v (.valAt this key nil)]
