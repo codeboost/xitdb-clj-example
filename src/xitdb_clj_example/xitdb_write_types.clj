@@ -1,17 +1,8 @@
 (ns xitdb-clj-example.xitdb-write-types
   (:require
-    [xitdb-clj-example.xitdb-types :as types]
     [xitdb-clj-example.xitdb-util :as util])
   (:import
-    (clojure.lang Associative IReduceInit)
-    [io.github.radarroark.xitdb
-     CoreFile CoreMemory Database$KeyNotFoundException Hasher Database
-     Database$ContextFunction Database$Bytes Database$Uint
-     RandomAccessMemory WriteArrayList WriteHashMap
-     ReadArrayList ReadLinkedArrayList ReadHashMap Tag
-     WriteCursor]
-    [java.io File RandomAccessFile]
-    [java.security MessageDigest]))
+    (io.github.radarroark.xitdb Tag WriteArrayList WriteHashMap)))
 
 (declare read-from-cursor unwrap)
 
@@ -154,10 +145,7 @@
     #_(println "value-tag:" (util/print-tag value-tag))
     (cond
       (contains? #{Tag/SHORT_BYTES Tag/BYTES} value-tag)
-      (let [s (String. (.readBytes cursor nil))]
-        (if (.startsWith s ":")
-          (keyword (.substring s 1))
-          s))
+      (util/string->maybe-keyword (String. (.readBytes cursor nil)))
 
       (= value-tag Tag/UINT)
       (.readUint cursor)

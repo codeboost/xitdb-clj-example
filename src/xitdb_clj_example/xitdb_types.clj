@@ -2,15 +2,7 @@
   (:require
     [xitdb-clj-example.xitdb-util :as util])
   (:import
-    (clojure.lang Associative IReduceInit)
-    [io.github.radarroark.xitdb
-     CoreFile CoreMemory Hasher Database
-     Database$ContextFunction Database$Bytes Database$Uint
-     RandomAccessMemory WriteArrayList WriteHashMap
-     ReadArrayList ReadLinkedArrayList ReadHashMap Tag
-     WriteCursor]
-    [java.io File RandomAccessFile]
-    [java.security MessageDigest]))
+    (io.github.radarroark.xitdb ReadArrayList ReadHashMap Tag)))
 
 (declare read-from-cursor)
 
@@ -187,7 +179,7 @@
   java.lang.Iterable
   (iterator [this]
     (let [entries (seq this)
-          entry-iter (when entries (.iterator (java.util.ArrayList. entries)))]
+          entry-iter (when entries (.iterator (java.util.ArrayList. ^java.util.Collection entries)))]
       (reify java.util.Iterator
         (hasNext [_]
           (and entry-iter (.hasNext entry-iter)))
@@ -204,10 +196,7 @@
   (let [value-tag (some-> cursor .slot .tag)]
     (cond
       (contains? #{Tag/SHORT_BYTES Tag/BYTES} value-tag)
-      (let [s (String. (.readBytes cursor nil))]
-        (if (.startsWith s ":")
-          (keyword (.substring s 1))
-          s))
+      (util/string->maybe-keyword (String. (.readBytes cursor nil)))
 
       (= value-tag Tag/UINT)
       (.readUint cursor)

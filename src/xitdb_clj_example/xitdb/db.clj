@@ -32,12 +32,8 @@
     nil
     (reify Database$ContextFunction
       (^void run [_ ^WriteCursor cursor]
-        (util/value-for! cursor new-value)
+        (util/slot-for-value! cursor new-value)
         nil))))
-
-(defn xitdb-read [history]
-  (let [cursor (.getCursor history -1)]
-    (xtypes/read-from-cursor cursor)))
 
 (defn open-database [filename]
   (let [core (if (= filename :memory)
@@ -54,7 +50,7 @@
     (instance? XITDBWriteHashMap v)
     (-> v .whm .cursor .slot)
     :else
-    (util/value-for! cursor v)))
+    (util/slot-for-value! cursor v)))
 
 (defn xitdb-swap! [db f & args]
   (let [history (db-history db)]
@@ -93,6 +89,7 @@
   IHistory
   (history [this]
     (db-history db))
+
   clojure.lang.IDeref
   (deref [_]
     (let [history (db-history db)

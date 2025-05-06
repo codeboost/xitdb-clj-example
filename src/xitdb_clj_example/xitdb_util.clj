@@ -1,9 +1,6 @@
 (ns xitdb-clj-example.xitdb-util
   (:import
-    (clojure.lang Associative)
-    [io.github.radarroark.xitdb
-     Database$Float Database$Bytes Database$Uint
-     WriteArrayList WriteHashMap Tag]))
+    [io.github.radarroark.xitdb Database$Float Database$Bytes Database$Uint WriteArrayList WriteHashMap Tag]))
 
 (defn print-tag [tag]
   (cond
@@ -20,14 +17,14 @@
     (= tag Tag/FLOAT) :float
     :else :unknown))
 
-(declare map->WriteHashMap!)
-(declare coll->WriteArrayList!)
+(declare map->WriteHashMapCursor!)
+(declare coll->ArrayListCursor!)
 
 (defn primitive-for [v]
   (cond
 
     (string? v)
-    (Database$Bytes. v)
+    (Database$Bytes. ^String v)
 
     (keyword? v)
     (Database$Bytes. (str v))
@@ -45,23 +42,7 @@
     :else
     (throw (IllegalArgumentException. (str "Unsupported type: " (type v))))))
 
-(defn coll->WriteArrayList! [cursor coll]
-  (let [write-array (WriteArrayList. cursor)]
-    (doseq [v coll]
-      (cond
-        (map? v)
-        (let [v-cursor (.appendCursor write-array)]
-          (map->WriteHashMap! v-cursor v))
-
-        (coll? v)
-        (let [v-cursor (.appendCursor write-array)]
-          (coll->WriteArrayList! v-cursor v))
-
-        :else
-        (.append write-array (primitive-for v))))
-    (.-cursor write-array)))
-
-(defn value-for! [cursor v]
+(defn slot-for-value! [cursor v]
   (cond
 
     (instance? WriteArrayList v)
@@ -73,12 +54,12 @@
     (map? v)
     (do
       (.write cursor nil)
-      (.slot (map->WriteHashMap! cursor v)))
+      (.slot (map->WriteHashMapCursor! cursor v)))
 
     (coll? v)
     (do
       (.write cursor nil)
-      (.slot (coll->WriteArrayList! cursor v)))
+      (.slot (coll->ArrayListCursor! cursor v)))
     :else
     (primitive-for v)))
 
@@ -88,27 +69,52 @@
   (assert (number? i))
 
   (when (> i (.count wal))
-    (throw (IllegalArgumentException. "Index out of bounds")))
+    (throw (IllegalArgumentException. "Index out of bounds. ")))
 
   (let [cursor (if (= i (.count wal))
                  (.appendCursor wal)
                  (.putCursor wal i))]
-    (.write cursor (value-for! cursor v))))
+    (.write cursor (slot-for-value! cursor v))))
+
+(defn ->hashmap-key [k]
+  ;;TODO: support other types for hashmap keys ?
+  (str k))
 
 (defn map-assoc-value [whm k v]
-  (let [k (str k)
+  (let [k (->hashmap-key k)
         cursor (.putCursor whm k)]
-    (.write cursor (value-for! cursor v))))
+    (.write cursor (slot-for-value! cursor v))))
 
-(defn map->WriteHashMap! [cursor m]
+(defn coll->ArrayListCursor! [cursor coll]
+  (let [write-array (WriteArrayList. cursor)]
+    (doseq [v coll]
+      (cond
+        (map? v)
+        (let [v-cursor (.appendCursor write-array)]
+          (map->WriteHashMapCursor! v-cursor v))
+
+        (coll? v)
+        (let [v-cursor (.appendCursor write-array)]
+          (coll->ArrayListCursor! v-cursor v))
+
+        :else
+        (.append write-array (primitive-for v))))
+    (.-cursor write-array)))
+
+(defn map->WriteHashMapCursor! [cursor m]
   (let [whm (WriteHashMap. cursor)]
     (doseq [[k v] m]
       (map-assoc-value whm k v))
     (.-cursor whm)))
 
-(defn has-key? [key-cursor]
+(defn key-tag-valid? [key-cursor]
   ;;TODO: Can the key have other types ?
   (contains? #{Tag/BYTES Tag/SHORT_BYTES} (-> key-cursor .slot .tag)))
+
+(defn string->maybe-keyword [s]
+  (if (.startsWith s ":")
+    (keyword (.substring s 1))
+    s))
 
 (defn map-seq
   "Iterates through a ReadHashMap or WriteHashMap.
@@ -122,9 +128,9 @@
         (let [cursor (.next iterator)
               kv-pair (.readKeyValuePair cursor)
               key-cursor (.-keyCursor kv-pair)]
-          (if (has-key? key-cursor)
+          (if (key-tag-valid? key-cursor)
             (let [key (String. (.readBytes key-cursor nil))
-                  key (if (.startsWith key ":") (keyword (.substring key 1)) key)
+                  key (string->maybe-keyword key)
                   value-cursor (.-valueCursor kv-pair)
                   value (read-from-cursor value-cursor)]
               (recur (conj entries (clojure.lang.MapEntry. key value))
