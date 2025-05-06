@@ -2,7 +2,9 @@
   (:import
     [io.github.radarroark.xitdb Database$Float Database$Bytes Database$Uint WriteArrayList WriteHashMap Tag]))
 
-(defn print-tag [tag]
+(defn xit-tag->keyword
+  "Converts a XitDB Tag enum to a corresponding Clojure keyword."
+  [tag]
   (cond
     (= tag Tag/NONE) :none
     (= tag Tag/INDEX) :index
@@ -20,7 +22,11 @@
 (declare map->WriteHashMapCursor!)
 (declare coll->ArrayListCursor!)
 
-(defn primitive-for [v]
+(defn primitive-for
+  "Converts a Clojure primitive value to its corresponding XitDB representation.
+  Handles strings, keywords, integers, booleans, and floats.
+  Throws an IllegalArgumentException for unsupported types."
+  [v]
   (cond
 
     (string? v)
@@ -42,7 +48,12 @@
     :else
     (throw (IllegalArgumentException. (str "Unsupported type: " (type v))))))
 
-(defn slot-for-value! [cursor v]
+(defn v->slot!
+  "Converts a value to a XitDB slot.
+  Handles WriteArrayList and WriteHashMap instances directly.
+  Recursively processes Clojure maps and collections.
+  Falls back to primitive conversion for other types."
+  [cursor v]
   (cond
 
     (instance? WriteArrayList v)
@@ -63,7 +74,12 @@
     :else
     (primitive-for v)))
 
-(defn array-list-assoc-value [wal i v]
+(defn array-list-assoc-value!
+  "Associates a value at index i in a WriteArrayList.
+  Appends the value if the index equals the current count.
+  Replaces the value at the specified index otherwise.
+  Throws an IllegalArgumentException if the index is out of bounds."
+  [wal i v]
 
   (assert (= Tag/ARRAY_LIST (-> wal .cursor .slot .tag)))
   (assert (number? i))
@@ -74,18 +90,26 @@
   (let [cursor (if (= i (.count wal))
                  (.appendCursor wal)
                  (.putCursor wal i))]
-    (.write cursor (slot-for-value! cursor v))))
+    (.write cursor (v->slot! cursor v))))
 
-(defn ->hashmap-key [k]
+(defn ->hashmap-key
+  [k]
   ;;TODO: support other types for hashmap keys ?
   (str k))
 
-(defn map-assoc-value [whm k v]
+(defn map-assoc-value!
+  "Associates a key-value pair in a WriteHashMap.
+  Converts the key to a string and the value to an appropriate XitDB representation."
+  [whm k v]
   (let [k (->hashmap-key k)
         cursor (.putCursor whm k)]
-    (.write cursor (slot-for-value! cursor v))))
+    (.write cursor (v->slot! cursor v))))
 
-(defn coll->ArrayListCursor! [cursor coll]
+(defn coll->ArrayListCursor!
+  "Converts a Clojure collection to a XitDB ArrayList cursor.
+  Handles nested maps and collections recursively.
+  Returns the cursor of the created WriteArrayList."
+  [cursor coll]
   (let [write-array (WriteArrayList. cursor)]
     (doseq [v coll]
       (cond
@@ -101,17 +125,25 @@
         (.append write-array (primitive-for v))))
     (.-cursor write-array)))
 
-(defn map->WriteHashMapCursor! [cursor m]
+(defn map->WriteHashMapCursor!
+  "Writes a Clojure map to a XitDB WriteHashMap.
+  Returns the cursor of the created WriteHashMap."
+  [cursor m]
   (let [whm (WriteHashMap. cursor)]
     (doseq [[k v] m]
-      (map-assoc-value whm k v))
+      (map-assoc-value! whm k v))
     (.-cursor whm)))
 
-(defn key-tag-valid? [key-cursor]
+(defn key-tag-valid?
+  "Checks if a key cursor has a valid tag type (bytes or short bytes)."
+  [key-cursor]
   ;;TODO: Can the key have other types ?
   (contains? #{Tag/BYTES Tag/SHORT_BYTES} (-> key-cursor .slot .tag)))
 
-(defn string->maybe-keyword [s]
+(defn string->maybe-keyword
+  "Converts a string to a keyword if it starts with a colon.
+  Otherwise returns the original string."
+  [s]
   (if (.startsWith s ":")
     (keyword (.substring s 1))
     s))

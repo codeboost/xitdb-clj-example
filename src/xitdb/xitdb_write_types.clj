@@ -13,7 +13,7 @@
 
   (cons [this o]
     ;;TODO: Figure out if it is correct to append to the end
-    (util/array-list-assoc-value wal (.count wal) (unwrap o))
+    (util/array-list-assoc-value! wal (.count wal) (unwrap o))
     this)
 
   (empty [this]
@@ -41,7 +41,7 @@
   (assoc [this k v]
     (when-not (integer? k)
       (throw (IllegalArgumentException. "Key must be integer")))
-    (util/array-list-assoc-value wal k (unwrap v))
+    (util/array-list-assoc-value! wal k (unwrap v))
     this)
 
   (containsKey [this k]
@@ -98,7 +98,7 @@
                  (seq this))))
   clojure.lang.Associative
   (assoc [this k v]
-    (util/map-assoc-value whm k (unwrap v))
+    (util/map-assoc-value! whm k (unwrap v))
     this)
 
   (containsKey [this key]
@@ -142,7 +142,7 @@
 
 (defn read-from-cursor [cursor]
   (let [value-tag (some-> cursor .slot .tag)]
-    #_(println "value-tag:" (util/print-tag value-tag))
+    #_(println "value-tag:" (util/xit-tag->keyword value-tag))
     (cond
       (contains? #{Tag/SHORT_BYTES Tag/BYTES} value-tag)
       (util/string->maybe-keyword (String. (.readBytes cursor nil)))
@@ -178,4 +178,4 @@
     (instance? XITDBWriteHashMap v)
     (-> v .whm .cursor .slot)
     :else
-    (util/slot-for-value! cursor v)))
+    (util/v->slot! cursor v)))

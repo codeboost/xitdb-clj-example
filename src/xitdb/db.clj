@@ -29,7 +29,7 @@
     nil
     (reify Database$ContextFunction
       (^void run [_ ^WriteCursor cursor]
-        (util/slot-for-value! cursor new-value)
+        (util/v->slot! cursor new-value)
         nil))))
 
 (defn open-database [filename]
