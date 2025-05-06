@@ -97,7 +97,21 @@
             result)))
       (catch Exception e
         (throw (RuntimeException. "Error reducing XITDBArrayList" e)))))
+  java.util.Collection
+  (^"[Ljava.lang.Object;" toArray [this]
+    (to-array (into [] this)))
 
+  (^"[Ljava.lang.Object;" toArray [this ^"[Ljava.lang.Object;" array]
+    (let [items (into [] this)
+          len (count items)
+          result (if (or (nil? array) (< (alength array) len))
+                   (make-array Object len)
+                   array)]
+      (dotimes [i len]
+        (aset result i (nth items i)))
+      (when (> (alength result) len)
+        (aset result len nil))
+      result))
   Object
   (toString [this]
     (pr-str (into [] this))))
