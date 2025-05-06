@@ -3,3 +3,5 @@
 .nrepl-port
 *.iml
 *.db
+.DS_Store
+*.xdb

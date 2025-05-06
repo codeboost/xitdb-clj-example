@@ -210,7 +210,7 @@
   (let [value-tag (some-> cursor .slot .tag)]
     (cond
       (contains? #{Tag/SHORT_BYTES Tag/BYTES} value-tag)
-      (util/string->maybe-keyword (String. (.readBytes cursor nil)))
+      (util/read-bytes cursor)
 
       (= value-tag Tag/UINT)
       (.readUint cursor)

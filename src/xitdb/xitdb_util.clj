@@ -33,20 +33,20 @@
     (Database$Bytes. ^String v)
 
     (keyword? v)
-    (Database$Bytes. (str v))
+    (Database$Bytes. (str v) "kw")
 
     ;;TODO: Database$Int doesn't work (stores null)
     (integer? v)
     (Database$Uint. v)
 
     (boolean? v)
-    (Database$Uint. (if v 1 0))
+    (Database$Bytes. (if v "1" "0") "bl")
 
     (float? v)
     (Database$Float. v)
 
     :else
-    (throw (IllegalArgumentException. (str "Unsupported type: " (type v))))))
+    (throw (IllegalArgumentException. (str "Unsupported type: " (type v) v)))))
 
 (defn v->slot!
   "Converts a value to a XitDB slot.
@@ -170,5 +170,17 @@
             (recur entries (.hasNext iterator))))
         (seq entries)))))
 
+(defn read-bytes [cursor]
+  (let [bytes-obj (.readBytesObject cursor)
+        str (String. (.value bytes-obj))
+        fmt-tag (String. (.formatTag bytes-obj))]
+    (cond
+      (= fmt-tag "kw")
+      (keyword str)
+
+      (= fmt-tag "bl")
+      (boolean (Integer/parseInt str))
+      :else
+      str)))
 
 
