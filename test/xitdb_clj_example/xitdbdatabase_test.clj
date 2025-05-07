@@ -18,6 +18,9 @@
       (swap! db assoc-in [:foo :bar :some] [1 2 3 4])
       (is (= {:foo {:bar {:some [1 2 3 4]}}} @db))
 
+      (swap! db assoc-in [:foo :bar :some] -42)
+      (is (= (:foo {:bar {:some -42}})))
+
       (is (tu/db-equal-to-atom? db)))))
 
 (deftest get-in-test
@@ -25,7 +28,18 @@
     (reset! db {:foo {:bar :baz}})
     (is (= :baz (get-in @db [:foo :bar])))
     (reset! db {"foo" {:bar {1 :baz}}})
-    (is (= :baz (get-in @db ["foo" :bar 1])))))
+    (is (= :baz (get-in @db ["foo" :bar 1])))
+
+    (testing "Negative keys and values"
+      (reset! db {-999 {:bar -42}})
+      (is (= {-999 {:bar -42}} (tu/materialize @db)))
+      (is (= -42 (get-in @db [-999 :bar])))
+
+      (reset! db [-39 23 "foo" :foo])
+      (is (= -39 (get-in @db [0])))
+      (is (= 23 (get-in @db [1])))
+      (is (= "foo" (get-in @db [2])))
+      (is (= :foo (get-in @db [3]))))))
 
 (deftest array-reset-test
   (with-db [db (tu/test-db)]
