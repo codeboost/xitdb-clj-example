@@ -2,7 +2,7 @@
   (:require
     [xitdb.xitdb-util :as util])
   (:import
-    (io.github.radarroark.xitdb Tag WriteArrayList WriteHashMap)))
+    (io.github.radarroark.xitdb Tag WriteArrayList WriteCursor WriteHashMap)))
 
 (declare read-from-cursor unwrap)
 
@@ -140,7 +140,7 @@
   (toString [this]
     (str "XITDBWriteHashMap")))
 
-(defn read-from-cursor [cursor]
+(defn read-from-cursor [^WriteCursor cursor]
   (let [value-tag (some-> cursor .slot .tag)]
     #_(println "value-tag:" (util/xit-tag->keyword value-tag))
     (cond
@@ -176,7 +176,7 @@
     :else
     v))
 
-(defn slot-for-value! [cursor v]
+(defn slot-for-value! [^WriteCursor cursor v]
   (cond
     (instance? XITDBWriteArrayList v)
     (-> v .wal .cursor .slot)

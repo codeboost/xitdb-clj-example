@@ -2,25 +2,20 @@
   (:require
     [xitdb.xitdb-util :as util])
   (:import
-    [io.github.radarroark.xitdb ReadArrayList ReadHashMap Tag]))
+    [io.github.radarroark.xitdb ReadArrayList ReadCursor ReadHashMap Tag]))
 
 (declare read-from-cursor)
-
 
 (deftype XITDBArrayList [ral]
   clojure.lang.IPersistentCollection
   (seq [_]
-    (try
-      (let [iter (.iterator ral)
-            items (loop [result []]
-                    (if (.hasNext iter)
-                      (let [cursor (.next iter)
-                            value (read-from-cursor cursor)]
-                        (recur (conj result value)))
-                      result))]
-        (seq items))
-      (catch Exception e
-        (throw (RuntimeException. "Error creating seq from XITDBArrayList" e)))))
+    (let [iter (.iterator ral)
+          lazy-iter (fn lazy-iter []
+                      (when (.hasNext iter)
+                        (let [cursor (.next iter)
+                              value (read-from-cursor cursor)]
+                          (lazy-seq (cons value (lazy-iter))))))]
+      (lazy-iter)))
 
   (count [_]
     (try
@@ -149,7 +144,7 @@
     (let [iter (.iterator rhm)]
       (loop [count 0]
         (if (.hasNext iter)
-          (do (.next iter) (recur (inc count)))
+          (do (.next iter) (recur (unchecked-inc count)))
           count))))
 
   clojure.lang.IPersistentCollection
@@ -190,7 +185,7 @@
   (toString [this]
     (str (into {} this))))
 
-(defn read-from-cursor [cursor]
+(defn read-from-cursor [^ReadCursor cursor]
   (let [value-tag (some-> cursor .slot .tag)]
     (cond
       (contains? #{Tag/SHORT_BYTES Tag/BYTES} value-tag)
