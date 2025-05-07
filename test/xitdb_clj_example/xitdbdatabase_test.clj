@@ -358,4 +358,7 @@
     (is (= 4 (count @db)))
 
     (swap! db dissoc :x :a :b :c :e)
-    (is (= 0 (count @db)))))
+    (is (= 0 (count @db)))
+
+    (is (thrown? IllegalArgumentException (swap! db assoc :%xitdb__count -3)))
+    (is (thrown? IllegalArgumentException (swap! db dissoc :%xitdb__count)))))

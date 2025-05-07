@@ -27,7 +27,7 @@
 
 ;; map of logical key -> key stored in the HashMap
 (def internal-keys
-  {:count :%count})
+  {:count :%xitdb__count})
 
 ;; HashMap keys which are used internally and should be hidden from user
 (def hidden-keys (set (vals internal-keys)))
@@ -131,13 +131,20 @@
 
 (defn map-dissoc-key!
   [whm k]
-  (when (.remove whm (keyname k))
+
+  (when (contains? hidden-keys k)
+    (throw (IllegalArgumentException. (str "Cannot dissoc key. " k ". It is reserved for internal use."))))
+
+  (when (.remove whm (db-key k))
     (update-map-item-count! whm dec)))
 
 (defn map-assoc-value!
   "Associates a key-value pair in a WriteHashMap.
   Converts the key to a string and the value to an appropriate XitDB representation."
   [whm k v]
+  (when (contains? hidden-keys k)
+    (throw (IllegalArgumentException. (str "Cannot assoc key. " k ". It is reserved for internal use."))))
+
   (let [existing (.getCursor whm (db-key k))
         cursor (.putCursor whm (db-key k))]
     (.write cursor (v->slot! cursor v))
