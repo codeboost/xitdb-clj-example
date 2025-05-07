@@ -102,12 +102,13 @@
     this)
 
   (containsKey [this key]
-    (not (nil? (.putCursor whm (util/write-key key)))))
+    (not (nil? (.getCursor whm (util/keyname key)))))
 
   (entryAt [this key]
-    (let [cursor (.putCursor whm (util/write-key key))]
-      (when (some? cursor)
-        (clojure.lang.MapEntry. key (read-from-cursor cursor)))))
+    (let [cursor (.getCursor whm (util/keyname key))]
+      (if (some? cursor)
+        (clojure.lang.MapEntry. key (read-from-cursor cursor))
+        (.putCursor whm (util/write-key key)))))
 
   clojure.lang.IPersistentMap
   (without [this key]
