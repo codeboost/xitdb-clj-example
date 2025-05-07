@@ -119,14 +119,14 @@
     (.valAt this key nil))
 
   (valAt [this key not-found]
-    (let [cursor (.getCursor rhm (util/read-key key))]
+    (let [cursor (.getCursor rhm (util/db-key key))]
       (if (nil? cursor)
         not-found
         (read-from-cursor cursor))))
 
   clojure.lang.Associative
   (containsKey [this key]
-    (not (nil? (.getCursor rhm (util/read-key key)))))
+    (not (nil? (.getCursor rhm (util/db-key key)))))
 
   (entryAt [this key]
     (let [v (.valAt this key nil)]

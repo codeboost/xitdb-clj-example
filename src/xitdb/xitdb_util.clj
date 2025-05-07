@@ -112,20 +112,9 @@
                  (.putCursor wal i))]
     (.write cursor (v->slot! cursor v))))
 
-(defn read-key
-  "Returns the key to be used in a ReadHashMap.getCursor(key) call."
-  [k]
-  (cond
-    (integer? k)
-    (str k) ;integer keys are stored as strings with 'ki' format tag
-
-    (boolean? k)
-    (str k)
-    :else
-    (keyname k)))
-
-(defn write-key
-  "Returns the key to be written to the database by WriteHashMap.putCursor()."
+(defn db-key
+  "Converts k from a Clojure type to a Database$Bytes representation to be used in
+  cursor functions."
   [k]
   (cond
     (integer? k)
@@ -134,8 +123,8 @@
     (primitive-for k)))
 
 (defn update-map-item-count! [whm f]
-  (let [existing (.getCursor whm (read-key (internal-keys :count)))]
-    (let [cursor (.putCursor whm (write-key (internal-keys :count)))]
+  (let [existing (.getCursor whm (db-key (internal-keys :count)))]
+    (let [cursor (.putCursor whm (db-key (internal-keys :count)))]
       (if existing
         (.write cursor (primitive-for (f (.readInt cursor))))
         (.write cursor (primitive-for 1))))))
@@ -149,8 +138,8 @@
   "Associates a key-value pair in a WriteHashMap.
   Converts the key to a string and the value to an appropriate XitDB representation."
   [whm k v]
-  (let [existing (.getCursor whm (read-key k))
-        cursor (.putCursor whm (write-key k))]
+  (let [existing (.getCursor whm (db-key k))
+        cursor (.putCursor whm (db-key k))]
     (.write cursor (v->slot! cursor v))
     (when existing
       (update-map-item-count! whm inc))
@@ -184,12 +173,6 @@
     (doseq [[k v] m]
       (map-assoc-value! whm k v))
     (.-cursor whm)))
-
-(defn key-tag-valid?
-  "Checks if a key cursor has a valid tag type (bytes or short bytes)."
-  [key-cursor]
-  ;;TODO: Can the key have other types ?
-  (contains? #{Tag/BYTES Tag/SHORT_BYTES} (-> key-cursor .slot .tag)))
 
 (defn read-bytes-with-format-tag [cursor]
   (let [bytes-obj (.readBytesObject cursor nil)

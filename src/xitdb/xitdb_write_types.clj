@@ -124,7 +124,7 @@
     (let [cursor (.getCursor whm (util/keyname key))]
       (if (nil? cursor)
         not-found
-        (read-from-cursor (.putCursor whm (util/write-key key))))))
+        (read-from-cursor (.putCursor whm (util/db-key key))))))
 
   clojure.lang.Seqable
   (seq [this]
