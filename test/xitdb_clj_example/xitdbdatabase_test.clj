@@ -359,6 +359,9 @@
 
     (swap! db dissoc :x :a :b :c :e)
     (is (= 0 (count @db)))
+    (is (empty? @db))
 
     (is (thrown? IllegalArgumentException (swap! db assoc :%xitdb__count -3)))
-    (is (thrown? IllegalArgumentException (swap! db dissoc :%xitdb__count)))))
+    (is (thrown? IllegalArgumentException (swap! db dissoc :%xitdb__count)))
+    
+    (is (tu/db-equal-to-atom? db))))
