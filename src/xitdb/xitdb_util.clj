@@ -19,10 +19,18 @@
     (= tag Tag/FLOAT) :float
     :else :unknown))
 
+;; map of logical tag -> string used as formatTag in the Bytes record.
 (def fmt-tag-value
   {:keyword "kw"
    :boolean "bl"
    :key-integer "ki"})
+
+;; map of logical key -> key stored in the HashMap
+(def internal-keys
+  {:count :%count})
+
+;; HashMap keys which are used internally and should be hidden from user
+(def hidden-keys (set (vals internal-keys)))
 
 (declare map->WriteHashMapCursor!)
 (declare coll->ArrayListCursor!)
@@ -110,6 +118,9 @@
   (cond
     (integer? k)
     (str k) ;integer keys are stored as strings with 'ki' format tag
+
+    (boolean? k)
+    (str k)
     :else
     (keyname k)))
 
@@ -122,12 +133,28 @@
     :else
     (primitive-for k)))
 
+(defn update-map-item-count! [whm f]
+  (let [existing (.getCursor whm (read-key (internal-keys :count)))]
+    (let [cursor (.putCursor whm (write-key (internal-keys :count)))]
+      (if existing
+        (.write cursor (primitive-for (f (.readInt cursor))))
+        (.write cursor (primitive-for 1))))))
+
+(defn map-dissoc-key!
+  [whm k]
+  (when (.remove whm (keyname k))
+    (update-map-item-count! whm dec)))
+
 (defn map-assoc-value!
   "Associates a key-value pair in a WriteHashMap.
   Converts the key to a string and the value to an appropriate XitDB representation."
   [whm k v]
-  (let [cursor (.putCursor whm (write-key k))]
-    (.write cursor (v->slot! cursor v))))
+  (let [existing (.getCursor whm (read-key k))
+        cursor (.putCursor whm (write-key k))]
+    (.write cursor (v->slot! cursor v))
+    (when existing
+      (update-map-item-count! whm inc))
+    whm))
 
 (defn coll->ArrayListCursor!
   "Converts a Clojure collection to a XitDB ArrayList cursor.
@@ -193,11 +220,13 @@
         (let [cursor (.next iterator)
               kv-pair (.readKeyValuePair cursor)
               key-cursor (.-keyCursor kv-pair)]
-          (let [key (read-bytes-with-format-tag key-cursor)
-                value-cursor (.-valueCursor kv-pair)
-                value (read-from-cursor value-cursor)]
-            (recur (conj entries (clojure.lang.MapEntry. key value))
-                 (.hasNext iterator))))
+          (let [key (read-bytes-with-format-tag key-cursor)]
+            (if (contains? hidden-keys key)
+              (recur entries (.hasNext iterator))
+              (let [value-cursor (.-valueCursor kv-pair)
+                    value (read-from-cursor value-cursor)]
+                (recur (conj entries (clojure.lang.MapEntry. key value))
+                     (.hasNext iterator))))))
         (seq entries)))))
 
 

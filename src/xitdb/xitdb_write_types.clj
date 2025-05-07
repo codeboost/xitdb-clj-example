@@ -105,23 +105,16 @@
     (not (nil? (.getCursor whm (util/keyname key)))))
 
   (entryAt [this key]
-    (let [cursor (.getCursor whm (util/keyname key))]
-      (if (some? cursor)
-        (clojure.lang.MapEntry. key (read-from-cursor cursor))
-        (.putCursor whm (util/write-key key)))))
+    (when (.containsKey this key)
+      (clojure.lang.MapEntry. key (.valAt this key))))
 
   clojure.lang.IPersistentMap
   (without [this key]
-    (.remove whm (util/keyname key))
+    (util/map-dissoc-key! whm key)
     this)
 
   (count [this]
-    (let [iter (.iterator whm)]
-      (loop [count 0]
-        (if (.hasNext iter)
-          (do (.next iter) (recur (inc count)))
-          count))))
-
+    (.valAt this (util/keyname :%count) 0))
 
   clojure.lang.ILookup
   (valAt [this key]

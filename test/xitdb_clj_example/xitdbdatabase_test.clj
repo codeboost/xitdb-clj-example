@@ -342,3 +342,20 @@
       (swap! db update-in [:users] #(mapv (juxt :name :age) %))
       (is (= {:users [["John" 30] ["Alice" 25]]} @db)))
     (is (tu/db-equal-to-atom? db))))
+
+(deftest CountTest
+  (with-db [db (tu/test-db)]
+    (reset! db {:a :b :c :d :e :f})
+    (is (= 3 (count @db)))
+
+    (swap! db assoc :x :y)
+    (is (= 4 (count @db)))
+
+    (swap! db merge {:o :p})
+    (is (= 5 (count @db)))
+
+    (swap! db dissoc :o)
+    (is (= 4 (count @db)))
+
+    (swap! db dissoc :x :a :b :c :e)
+    (is (= 0 (count @db)))))
