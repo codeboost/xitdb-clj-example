@@ -363,5 +363,31 @@
 
     (is (thrown? IllegalArgumentException (swap! db assoc :%xitdb__count -3)))
     (is (thrown? IllegalArgumentException (swap! db dissoc :%xitdb__count)))
-    
+
     (is (tu/db-equal-to-atom? db))))
+
+(deftest NilTest
+  (testing "nil values"
+    (with-db [db (tu/test-db)]
+      (reset! db {:one nil})
+      (is (= {:one nil} @db))
+
+      (swap! db update :one conj 1)
+      (is (= {:one [1]} @db))
+
+      (reset! db [1 nil nil 2 3 nil])
+      (is (= [1 nil nil 2 3 nil] @db))
+
+      (reset! db nil)
+      (is (= nil @db))
+      @db))
+
+  (testing "nil keys"
+    (with-db [db (tu/test-db)]
+      (reset! db {:one nil})
+      (is (= {:one nil} @db))
+      (swap! db merge {nil nil})
+
+      (is (= {:one nil nil nil} @db))
+      (is (= {nil nil} (select-keys @db [nil]))))))
+

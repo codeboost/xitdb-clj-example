@@ -23,7 +23,8 @@
 (def fmt-tag-value
   {:keyword "kw"
    :boolean "bl"
-   :key-integer "ki"})
+   :key-integer "ki"
+   :nil "nl"})
 
 ;; map of logical key -> key stored in the HashMap
 (def internal-keys
@@ -64,6 +65,9 @@
 
     (double? v)
     (Database$Float. v)
+
+    (nil? v)
+    (Database$Bytes. "" (fmt-tag-value :nil))
 
     :else
     (throw (IllegalArgumentException. (str "Unsupported type: " (type v) v)))))
@@ -186,6 +190,7 @@
         str (String. (.value bytes-obj))
         fmt-tag (some-> bytes-obj .formatTag String.)]
     (cond
+
       (= fmt-tag (fmt-tag-value :keyword))
       (keyword str)
 
@@ -194,6 +199,9 @@
 
       (= fmt-tag (fmt-tag-value :key-integer))
       (Integer/parseInt str)
+
+      (= fmt-tag (fmt-tag-value :nil))
+      nil
 
       :else
       str)))
