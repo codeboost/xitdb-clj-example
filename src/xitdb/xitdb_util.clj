@@ -1,6 +1,6 @@
 (ns xitdb.xitdb-util
   (:import
-    [io.github.radarroark.xitdb Database$Float Database$Bytes Database$Uint WriteArrayList WriteHashMap Tag]))
+    [io.github.radarroark.xitdb Database$Float Database$Bytes Database$Int Database$Uint WriteArrayList WriteHashMap Tag]))
 
 (defn xit-tag->keyword
   "Converts a XitDB Tag enum to a corresponding Clojure keyword."
@@ -47,9 +47,9 @@
     (keyword? v)
     (Database$Bytes. (keyname v) (fmt-tag-value :keyword))
 
-    ;;TODO: Database$Int doesn't work (stores null)
+
     (integer? v)
-    (Database$Uint. v)
+    (Database$Int. v)
 
     (boolean? v)
     (Database$Bytes. (if v "#t" "#f") (fmt-tag-value :boolean))
