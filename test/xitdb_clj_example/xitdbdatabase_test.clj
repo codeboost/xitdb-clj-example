@@ -312,6 +312,16 @@
 
     (is (tu/db-equal-to-atom? db))))
 
+(deftest EmptyOnArray
+  (with-db [db (tu/test-db)]
+    (reset! db [1 2 3])
+    (swap! db empty)
+    (is (= [] @db))
+    (reset! db {:one [1 2 4]})
+    (swap! db update :one empty)
+    (is (= {:one []} @db))
+    @db))
+
 (deftest MiscOpsTest
   (with-db [db (tu/test-db)]
     (testing "empty"
@@ -323,9 +333,12 @@
       (swap! db empty)
       (is (= [] @db)))
 
+    (is (tu/db-equal-to-atom? db))))
+
+(deftest JuxtTest
+  (with-db [db (tu/test-db)]
     (testing "juxt"
       (reset! db {:users [{:name "John" :age 30} {:name "Alice" :age 25}]})
-      (swap! db update-in [:users] #(mapv ((juxt :name :age)) %))
+      (swap! db update-in [:users] #(mapv (juxt :name :age) %))
       (is (= {:users [["John" 30] ["Alice" 25]]} @db)))
-
     (is (tu/db-equal-to-atom? db))))

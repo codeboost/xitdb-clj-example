@@ -17,7 +17,8 @@
     this)
 
   (empty [this]
-    #_(XITDBWriteArrayList. wal))
+    (.write (-> wal .cursor) (util/v->slot! (-> wal .cursor) []))
+    this)
 
   (equiv [this other]
     (if (instance? XITDBWriteArrayList other)
@@ -32,9 +33,7 @@
 
   (nth [this i not-found]
     (if (and (>= i 0) (< i (.count wal)))
-      (let [ret (read-from-cursor (.putCursor wal i))]
-        #_(println "read-from-cursor " i (count ret))
-        ret)
+      (read-from-cursor (.putCursor wal i))
       not-found))
 
   clojure.lang.Associative
@@ -69,7 +68,6 @@
 
 ;;---------------------------------------
 
-
 (deftype XITDBWriteHashMap [whm]
   clojure.lang.IPersistentCollection
   (cons [this o]
@@ -91,7 +89,8 @@
     this)
 
   (empty [this]
-    (throw (IllegalArgumentException. "empty not implemented")))
+    (.write (-> whm .cursor) (util/v->slot! (-> whm .cursor) {}))
+    this)
 
   (equiv [this other]
     (and (= (count this) (count other))
