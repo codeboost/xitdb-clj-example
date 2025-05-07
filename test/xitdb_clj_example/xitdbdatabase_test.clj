@@ -391,3 +391,16 @@
       (is (= {:one nil nil nil} @db))
       (is (= {nil nil} (select-keys @db [nil]))))))
 
+(deftest InstAndDateTest
+  (with-db [db (tu/test-db)]
+    (let [d (java.util.Date.)
+          instant (.toInstant d)]
+      (reset! db {:foo instant
+                  :bar d})
+      (is (= instant (:foo @db)))
+      (is (= d (:bar @db)))
+
+      (is (instance? java.util.Date (:bar @db))))))
+
+
+

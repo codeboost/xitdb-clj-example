@@ -21,10 +21,12 @@
 
 ;; map of logical tag -> string used as formatTag in the Bytes record.
 (def fmt-tag-value
-  {:keyword "kw"
-   :boolean "bl"
+  {:keyword     "kw"
+   :boolean     "bl"
    :key-integer "ki"
-   :nil "nl"})
+   :nil         "nl"
+   :inst        "in"
+   :date        "da"})
 
 ;; map of logical key -> key stored in the HashMap
 (def internal-keys
@@ -42,6 +44,11 @@
       (str (namespace key) "/" (name key))
       (name key))
     key))
+
+(let [d (java.util.Date.)
+      sd (str (.toInstant d))
+      parsed-inst (java.time.Instant/parse sd)]
+  (instance? java.time.Instant parsed-inst))
 
 (defn primitive-for
   "Converts a Clojure primitive value to its corresponding XitDB representation.
@@ -68,6 +75,12 @@
 
     (nil? v)
     (Database$Bytes. "" (fmt-tag-value :nil))
+
+    (instance? java.time.Instant v)
+    (Database$Bytes. (str v) (fmt-tag-value :inst))
+
+    (instance? java.util.Date v)
+    (Database$Bytes. (str (.toInstant v)) (fmt-tag-value :date))
 
     :else
     (throw (IllegalArgumentException. (str "Unsupported type: " (type v) v)))))
@@ -185,6 +198,8 @@
       (map-assoc-value! whm k v))
     (.-cursor whm)))
 
+
+
 (defn read-bytes-with-format-tag [cursor]
   (let [bytes-obj (.readBytesObject cursor nil)
         str (String. (.value bytes-obj))
@@ -199,6 +214,15 @@
 
       (= fmt-tag (fmt-tag-value :key-integer))
       (Integer/parseInt str)
+
+      (= fmt-tag (fmt-tag-value :inst))
+      (java.time.Instant/parse str)
+
+
+      (= fmt-tag (fmt-tag-value :date))
+      (java.util.Date/from
+        (java.time.Instant/parse str))
+
 
       (= fmt-tag (fmt-tag-value :nil))
       nil
