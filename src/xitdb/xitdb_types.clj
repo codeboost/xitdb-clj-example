@@ -202,6 +202,9 @@
       (= value-tag Tag/INT)
       (.readInt cursor)
 
+      (= value-tag Tag/FLOAT)
+      (.readFloat cursor)
+
       (= value-tag Tag/HASH_MAP)
       (XITDBHashMap. (ReadHashMap. cursor))
 

@@ -39,7 +39,14 @@
       (is (= -39 (get-in @db [0])))
       (is (= 23 (get-in @db [1])))
       (is (= "foo" (get-in @db [2])))
-      (is (= :foo (get-in @db [3]))))))
+      (is (= :foo (get-in @db [3]))))
+
+    (testing "Float values"
+      (reset! db {-34 0.345542})
+      (is (= @db {-34 0.345542}))
+      (swap! db assoc -424 3.949494958483)
+      (is (= {-34 0.345542, -424 3.949494958483}
+             (tu/materialize @db))))))
 
 (deftest array-reset-test
   (with-db [db (tu/test-db)]

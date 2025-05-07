@@ -54,7 +54,7 @@
     (boolean? v)
     (Database$Bytes. (if v "#t" "#f") (fmt-tag-value :boolean))
 
-    (float? v)
+    (double? v)
     (Database$Float. v)
 
     :else
