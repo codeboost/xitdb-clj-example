@@ -79,11 +79,12 @@
       (.assoc this (key o) (val o))
 
       (map? o)
-      (let [[k v] (first o)]
+      (doseq [[k v] (seq o)]
         (.assoc this k v))
 
       (and (sequential? o) (= 2 (count o)))
-      (.assoc this (first o) (second o))
+      (do
+        (.assoc this (first o) (second o)))
 
       :else
       (throw (IllegalArgumentException. "Can only cons MapEntries or key-value pairs onto maps")))

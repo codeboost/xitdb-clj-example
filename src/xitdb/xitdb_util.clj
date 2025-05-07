@@ -193,13 +193,11 @@
         (let [cursor (.next iterator)
               kv-pair (.readKeyValuePair cursor)
               key-cursor (.-keyCursor kv-pair)]
-          (if (key-tag-valid? key-cursor)
-            (let [key (read-bytes-with-format-tag key-cursor)
-                  value-cursor (.-valueCursor kv-pair)
-                  value (read-from-cursor value-cursor)]
-              (recur (conj entries (clojure.lang.MapEntry. key value))
-                     (.hasNext iterator)))
-            (recur entries (.hasNext iterator))))
+          (let [key (read-bytes-with-format-tag key-cursor)
+                value-cursor (.-valueCursor kv-pair)
+                value (read-from-cursor value-cursor)]
+            (recur (conj entries (clojure.lang.MapEntry. key value))
+                 (.hasNext iterator))))
         (seq entries)))))
 
 

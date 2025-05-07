@@ -193,33 +193,45 @@
       (is (tu/db-equal-to-atom? db)))))
 
 (deftest MergeTest
-  (with-db [db (tu/test-db)]
-    (reset! db {"1" {:name "jp"}
-                "2" {:name "cj"}})
+  (testing "Basic merges"
+    (with-db [db (tu/test-db)]
+      (reset! db {"1" {:name "jp"}
+                  "2" {:name "cj"}})
 
-    (swap! db merge {"3" {:name "maria"}})
+      (swap! db merge {"3" {:name "maria"}})
 
-    (is (= {"1" {:name "jp"}
-            "2" {:name "cj"}
-            "3" {:name "maria"}}
-           @db))
+      (is (= {"1" {:name "jp"}
+              "2" {:name "cj"}
+              "3" {:name "maria"}}
+             @db))
 
-    (swap! db merge {:foo [:bar]})
-    (is (= {"1" {:name "jp"}
-            "2" {:name "cj"}
-            "3" {:name "maria"}
-            :foo [:bar]}
-           @db))
-    (is (tu/db-equal-to-atom? db))))
+      (swap! db merge {:foo [:bar]})
+      (is (= {"1" {:name "jp"}
+              "2" {:name "cj"}
+              "3" {:name "maria"}
+              :foo [:bar]}
+             @db))
+      (is (tu/db-equal-to-atom? db))))
+  (testing "merge-with"
+    (with-db [db (tu/test-db)]
+      (reset! db {"1" {:foo1 {:bar :baz}}})
+      (swap! db merge {"2" {:foo2 :bar2}})
+      (swap! db merge {"3" {:foo3 :bar3}})
+      (swap! db merge {"4" [1 2 3]})
+      (swap! db (fn [a]
+                  (merge-with into a {"4" [44]})))
+      (is (= {"2" {:foo2 :bar2}
+              "4" [1 2 3 44]
+              "1" {:foo1 {:bar :baz}}
+              "3" {:foo3 :bar3}}
+             (tu/materialize @db))))))
 
 (deftest IntoTest
   (with-db [db (tu/test-db)]
     (reset! db [0 1 2 3 4])
     (swap! db #(filterv even? %))
     (is (= [0 2 4]
-           @db))
-    @db))
-
+           @db))))
 
 ;;; Tests below were AI generated
 
@@ -299,7 +311,6 @@
       (is (= [[1 2] [3 4] [5 6]] @db)))
 
     (is (tu/db-equal-to-atom? db))))
-
 
 (deftest MiscOpsTest
   (with-db [db (tu/test-db)]
