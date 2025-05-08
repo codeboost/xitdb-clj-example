@@ -241,7 +241,7 @@
                         kv     (.readKeyValuePair cursor)
                         k      (read-bytes-with-format-tag (.-keyCursor kv))]
                     (if (contains? hidden-keys k)
-                      (recur)
+                      (step)
                       (let [v (read-from-cursor (.-valueCursor kv))]
                         (cons (clojure.lang.MapEntry. k v) (step))))))))]
       (step))))

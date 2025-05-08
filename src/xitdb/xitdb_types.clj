@@ -156,7 +156,7 @@
 
   clojure.lang.Seqable
   (seq [this]
-    (seq (util/map-seq rhm read-from-cursor)))
+    (util/map-seq rhm read-from-cursor))
 
   clojure.lang.IFn
   (invoke [this k]
