@@ -28,10 +28,8 @@
    :inst        "in"
    :date        "da"})
 
-;; Mapping from true/false to string stored as value in a Bytes record
-(def bool-str
-  {true "#t"
-   false "#f"})
+(def true-str "#t")
+(def false-str "#f")
 
 ;; map of logical key -> key stored in the HashMap
 (def internal-keys
@@ -68,7 +66,7 @@
     (Database$Int. v)
 
     (boolean? v)
-    (Database$Bytes. (bool-str v) (fmt-tag-value :boolean))
+    (Database$Bytes. (if v true-str false-str) (fmt-tag-value :boolean))
 
     (double? v)
     (Database$Float. v)
@@ -208,7 +206,7 @@
       (keyword str)
 
       (= fmt-tag (fmt-tag-value :boolean))
-      (= str (bool-str true))
+      (= str true-str)
 
       (= fmt-tag (fmt-tag-value :key-integer))
       (Integer/parseInt str)
