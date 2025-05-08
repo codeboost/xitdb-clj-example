@@ -12,10 +12,7 @@
     (util/array-seq ral read-from-cursor))
 
   (count [_]
-    (try
-      (.count ral)
-      (catch Exception e
-        (throw (RuntimeException. "Error getting count from XITDBArrayList" e)))))
+    (.count ral))
 
   (cons [_ o]
     (throw (UnsupportedOperationException. "XITDBArrayList is read-only")))
@@ -69,20 +66,9 @@
       (throw (IllegalArgumentException. "Wrong number of args passed to XITDBArrayList"))))
 
   clojure.lang.IReduceInit
-  (reduce [_ f init]
-    (try
-      (let [iter (.iterator ral)]
-        (loop [result init]
-          (if (.hasNext iter)
-            (let [cursor (.next iter)
-                  value (read-from-cursor cursor)
-                  new-result (f result value)]
-              (if (reduced? new-result)
-                @new-result
-                (recur new-result)))
-            result)))
-      (catch Exception e
-        (throw (RuntimeException. "Error reducing XITDBArrayList" e)))))
+  (reduce [this f init]
+    (reduce f init (util/array-seq ral read-from-cursor)))
+
   java.util.Collection
   (^"[Ljava.lang.Object;" toArray [this]
     (to-array (into [] this)))
@@ -173,6 +159,10 @@
   Object
   (toString [this]
     (str (into {} this))))
+
+(defmethod print-method XITDBHashMap [o ^java.io.Writer w]
+  (.write w "#XITDBHashMap")
+  (print-method (into {} o) w))
 
 (defn read-from-cursor [^ReadCursor cursor]
   (let [value-tag (some-> cursor .slot .tag)]
