@@ -246,6 +246,13 @@
                         (cons (clojure.lang.MapEntry. k v) (step))))))))]
       (step))))
 
-
+(defn array-seq [ral read-from-cursor]
+  (let [iter (.iterator ral)
+        lazy-iter (fn lazy-iter []
+                    (when (.hasNext iter)
+                      (let [cursor (.next iter)
+                            value (read-from-cursor cursor)]
+                        (lazy-seq (cons value (lazy-iter))))))]
+    (lazy-iter)))
 
 

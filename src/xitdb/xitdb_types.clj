@@ -9,13 +9,7 @@
 (deftype XITDBArrayList [ral]
   clojure.lang.IPersistentCollection
   (seq [_]
-    (let [iter (.iterator ral)
-          lazy-iter (fn lazy-iter []
-                      (when (.hasNext iter)
-                        (let [cursor (.next iter)
-                              value (read-from-cursor cursor)]
-                          (lazy-seq (cons value (lazy-iter))))))]
-      (lazy-iter)))
+    (util/array-seq ral read-from-cursor))
 
   (count [_]
     (try
@@ -167,15 +161,14 @@
 
   java.lang.Iterable
   (iterator [this]
-    (let [entries (seq this)
-          entry-iter (when entries (.iterator (java.util.ArrayList. ^java.util.Collection entries)))]
+    (let [iter (clojure.lang.SeqIterator. (seq this))]
       (reify java.util.Iterator
         (hasNext [_]
-          (and entry-iter (.hasNext entry-iter)))
+          (.hasNext iter))
         (next [_]
-          (.next entry-iter))
+          (.next iter))
         (remove [_]
-          (throw (UnsupportedOperationException. "XITDBHashMap iterator is read-only"))))))
+            (throw (UnsupportedOperationException. "XITDBHashMap iterator is read-only"))))))
 
   Object
   (toString [this]
