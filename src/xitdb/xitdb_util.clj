@@ -28,6 +28,11 @@
    :inst        "in"
    :date        "da"})
 
+;; Mapping from true/false to string stored as value in a Bytes record
+(def bool-str
+  {true "#t"
+   false "#f"})
+
 ;; map of logical key -> key stored in the HashMap
 (def internal-keys
   {:count :%xitdb__count})
@@ -44,11 +49,6 @@
       (str (namespace key) "/" (name key))
       (name key))
     key))
-
-(let [d (java.util.Date.)
-      sd (str (.toInstant d))
-      parsed-inst (java.time.Instant/parse sd)]
-  (instance? java.time.Instant parsed-inst))
 
 (defn primitive-for
   "Converts a Clojure primitive value to its corresponding XitDB representation.
@@ -68,7 +68,7 @@
     (Database$Int. v)
 
     (boolean? v)
-    (Database$Bytes. (if v "#t" "#f") (fmt-tag-value :boolean))
+    (Database$Bytes. (bool-str v) (fmt-tag-value :boolean))
 
     (double? v)
     (Database$Float. v)
@@ -198,8 +198,6 @@
       (map-assoc-value! whm k v))
     (.-cursor whm)))
 
-
-
 (defn read-bytes-with-format-tag [cursor]
   (let [bytes-obj (.readBytesObject cursor nil)
         str (String. (.value bytes-obj))
@@ -210,7 +208,7 @@
       (keyword str)
 
       (= fmt-tag (fmt-tag-value :boolean))
-      (= str "#t")
+      (= str (bool-str true))
 
       (= fmt-tag (fmt-tag-value :key-integer))
       (Integer/parseInt str)
