@@ -231,28 +231,20 @@
       str)))
 
 (defn map-seq
-  "Iterates through a ReadHashMap or WriteHashMap.
-  `read-from-cursor` is a function which reads the data and converts
-  it into the proper XITDBHashMap or XITDBWriteHashMap types.
-  Returns a lazy sequence of key-value entries."
+  "Return a lazy seq of key-value MapEntry pairs, skipping hidden keys."
   [rhm read-from-cursor]
-  (let [iterator (.iterator rhm)
-        lazy-iter (fn lazy-iter []
-                    (lazy-seq
-                      (when (.hasNext iterator)
-                        (let [cursor (.next iterator)
-                              kv-pair (.readKeyValuePair cursor)
-                              key-cursor (.-keyCursor kv-pair)
-                              key (read-bytes-with-format-tag key-cursor)]
-                          (if (contains? hidden-keys key)
-                            ;; Skip hidden keys by recursing
-                            (lazy-iter)
-                            ;; Return this entry and the rest of the sequence
-                            (let [value-cursor (.-valueCursor kv-pair)
-                                  value (read-from-cursor value-cursor)
-                                  entry (clojure.lang.MapEntry. key value)]
-                              (cons entry (lazy-iter))))))))]
-    (lazy-iter)))
+  (let [it (.iterator rhm)]
+    (letfn [(step []
+              (lazy-seq
+                (when (.hasNext it)
+                  (let [cursor (.next it)
+                        kv     (.readKeyValuePair cursor)
+                        k      (read-bytes-with-format-tag (.-keyCursor kv))]
+                    (if (contains? hidden-keys k)
+                      (recur)
+                      (let [v (read-from-cursor (.-valueCursor kv))]
+                        (cons (clojure.lang.MapEntry. k v) (step))))))))]
+      (step))))
 
 
 

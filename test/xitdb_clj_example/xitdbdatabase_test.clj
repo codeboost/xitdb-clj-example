@@ -344,8 +344,25 @@
       (is (= {:users [["John" 30] ["Alice" 25]]} @db)))
     (is (tu/db-equal-to-atom? db))))
 
+(deftest EmptyTest
+  (with-db [db (tu/test-db)]
+    (reset! db {})
+    (is (empty? @db))
+
+    (reset! db [])
+    (is (empty? @db))
+
+    (swap! db conj 1)
+    (is (false? (empty? @db)))
+
+    (swap! db butlast)
+    (is (empty? @db))
+
+    (is (tu/db-equal-to-atom? db))))
+
+
 (deftest CountTest
-  (with-db [db (tu/test-memory-db-raw)]
+  (with-db [db (tu/test-db)]
     (reset! db {:a :b :c :d :e :f})
     (is (= 3 (count @db)))
 
@@ -359,15 +376,7 @@
     (is (thrown? IllegalArgumentException (swap! db assoc :%xitdb__count -3)))
     (is (thrown? IllegalArgumentException (swap! db dissoc :%xitdb__count)))
 
-    #_(is (tu/db-equal-to-atom? db))))
-
-(defn empty-test
-  (with-db [db (tu/test-memory-db-raw)]
-    (reset! db {})
-    @db
-
-    #_(is (tu/db-equal-to-atom? db))))
-
+    (is (tu/db-equal-to-atom? db))))
 
 (deftest NilTest
   (testing "nil values"
