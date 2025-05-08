@@ -140,15 +140,15 @@
     (primitive-for k)))
 
 (defn update-map-item-count! [whm f]
-  (let [existing (.getCursor whm (db-key (internal-keys :count)))]
-    (let [cursor (.putCursor whm (db-key (internal-keys :count)))]
-      (if existing
-        (.write cursor (primitive-for (f (.readInt cursor))))
-        (.write cursor (primitive-for 1))))))
+  (let [count-cursor (.putCursor whm (db-key (internal-keys :count)))
+        value (try
+                (.readInt count-cursor)
+                (catch Exception _ 0))
+        new-value (primitive-for (f (or value 0)))]
+    (.write count-cursor new-value)))
 
 (defn map-dissoc-key!
   [whm k]
-
   (when (contains? hidden-keys k)
     (throw (IllegalArgumentException. (str "Cannot dissoc key. " k ". It is reserved for internal use."))))
 
@@ -165,7 +165,7 @@
   (let [existing (.getCursor whm (db-key k))
         cursor (.putCursor whm (db-key k))]
     (.write cursor (v->slot! cursor v))
-    (when existing
+    (when-not existing
       (update-map-item-count! whm inc))
     whm))
 

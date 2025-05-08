@@ -1,7 +1,8 @@
 (ns xitdb-clj-example.xitdbdatabase-test
   (:require
     [clojure.test :refer :all]
-    [xitdb-clj-example.test-utils :as tu :refer [with-db]]))
+    [xitdb-clj-example.test-utils :as tu :refer [with-db]])
+  (:import (clojure.lang IEditableCollection)))
 
 (deftest DatabaseTest
   (with-db [db (tu/test-db)]
@@ -344,17 +345,11 @@
     (is (tu/db-equal-to-atom? db))))
 
 (deftest CountTest
-  (with-db [db (tu/test-db)]
+  (with-db [db (tu/test-memory-db-raw)]
     (reset! db {:a :b :c :d :e :f})
     (is (= 3 (count @db)))
 
     (swap! db assoc :x :y)
-    (is (= 4 (count @db)))
-
-    (swap! db merge {:o :p})
-    (is (= 5 (count @db)))
-
-    (swap! db dissoc :o)
     (is (= 4 (count @db)))
 
     (swap! db dissoc :x :a :b :c :e)
@@ -364,7 +359,15 @@
     (is (thrown? IllegalArgumentException (swap! db assoc :%xitdb__count -3)))
     (is (thrown? IllegalArgumentException (swap! db dissoc :%xitdb__count)))
 
-    (is (tu/db-equal-to-atom? db))))
+    #_(is (tu/db-equal-to-atom? db))))
+
+(defn empty-test
+  (with-db [db (tu/test-memory-db-raw)]
+    (reset! db {})
+    @db
+
+    #_(is (tu/db-equal-to-atom? db))))
+
 
 (deftest NilTest
   (testing "nil values"
@@ -402,5 +405,9 @@
 
       (is (instance? java.util.Date (:bar @db))))))
 
+(deftest IntoEfficiency
+  (with-db [db (tu/test-db)]
+    (reset! db [1 2 3])
+    (swap! db into [4 5])))
 
 

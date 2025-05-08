@@ -59,8 +59,12 @@
 
   clojure.lang.Seqable
   (seq [this]
-    (when (> (.count wal) 0)
-      (map #(.valAt this %) (range (.count wal)))))
+    (letfn [(lazy-seq-impl [i]
+              (when (< i (.count wal))
+                (lazy-seq
+                  (cons (.valAt this i)
+                        (lazy-seq-impl (inc i))))))]
+      (lazy-seq-impl 0)))
 
   Object
   (toString [this]
@@ -114,7 +118,7 @@
     this)
 
   (count [this]
-    (.valAt this (util/keyname :%count) 0))
+    (.valAt this (util/internal-keys :count) 0))
 
   clojure.lang.ILookup
   (valAt [this key]

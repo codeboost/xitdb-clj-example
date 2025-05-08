@@ -141,11 +141,7 @@
     (throw (UnsupportedOperationException. "XITDBHashMap is read-only")))
 
   (count [this]
-    (let [iter (.iterator rhm)]
-      (loop [count 0]
-        (if (.hasNext iter)
-          (do (.next iter) (recur (unchecked-inc count)))
-          count))))
+    (.valAt this (util/internal-keys :count) 0))
 
   clojure.lang.IPersistentCollection
   (cons [_ _]
