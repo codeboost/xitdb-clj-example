@@ -148,6 +148,9 @@
 
   (.slice wal (dec (.count wal))))
 
+(defn array-list-empty! [^WriteArrayList wal]
+  (let [^WriteCursor cursor (-> wal .cursor)]
+    (.write cursor (v->slot! cursor []))))
 
 (defn ^Database$Bytes db-key
   "Converts k from a Clojure type to a Database$Bytes representation to be used in

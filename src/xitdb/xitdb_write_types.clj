@@ -5,8 +5,9 @@
     (io.github.radarroark.xitdb Tag WriteArrayList WriteCursor WriteHashMap)))
 
 (declare read-from-cursor unwrap)
+(declare ->XITDBWriteArrayList)
 
-(deftype XITDBWriteArrayList [wal]
+(deftype XITDBWriteArrayList [^WriteArrayList wal]
   clojure.lang.IPersistentCollection
   (count [this]
     (.count wal))
@@ -17,7 +18,7 @@
     this)
 
   (empty [this]
-    (.write (-> wal .cursor) (util/v->slot! (-> wal .cursor) []))
+    (util/array-list-empty! wal)
     this)
 
   (equiv [this other]
@@ -59,12 +60,34 @@
 
   clojure.lang.Seqable
   (seq [this]
-    (letfn [(lazy-seq-impl [i]
-              (when (< i (.count wal))
-                (lazy-seq
-                  (cons (.valAt this i)
-                        (lazy-seq-impl (inc i))))))]
-      (lazy-seq-impl 0)))
+    (util/array-seq wal read-from-cursor))
+
+  clojure.lang.IObj
+  (withMeta [this _]
+    this)
+
+  clojure.lang.IMeta
+  (meta [this]
+    nil)
+
+  clojure.lang.IEditableCollection
+  (asTransient [this]
+    this)
+
+  clojure.lang.ITransientCollection
+  (conj [this val]
+    (util/array-list-append-value! wal (unwrap val))
+    this)
+
+  (persistent [this]
+    this)
+
+  clojure.lang.ITransientVector ;; assoc already implemented
+
+  (pop [this]
+    (let [value (read-from-cursor (-> wal .-cursor))]
+      (util/array-list-pop! wal)
+      value))
 
   Object
   (toString [this]
