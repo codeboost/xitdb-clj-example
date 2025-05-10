@@ -11,10 +11,10 @@
     [java.io File RandomAccessFile]
     [java.security MessageDigest]))
 
-(defn db-history [db]
+(defn ^WriteArrayList db-history [^Database db]
   (WriteArrayList. (.rootCursor db)))
 
-(defn append-context [history fn]
+(defn append-context [^WriteArrayList history fn]
   (.appendContext
     history
     (.getSlot history -1)
@@ -23,7 +23,7 @@
         (fn cursor)
         nil))))
 
-(defn xitdb-reset! [history new-value]
+(defn xitdb-reset! [^WriteArrayList history new-value]
   (.appendContext
     history
     nil
@@ -35,14 +35,14 @@
 (defn open-database [filename]
   (let [core (if (= filename :memory)
                (CoreMemory. (RandomAccessMemory.))
-               (CoreFile. (RandomAccessFile. (File. filename) "rw")))
+               (CoreFile. (RandomAccessFile. (File. ^String filename) "rw")))
         hasher (Hasher. (MessageDigest/getInstance "SHA-1"))]
     (Database. core hasher)))
 
 
 (defn xitdb-swap! [db f & args]
   (let [history (db-history db)]
-    (append-context history (fn [cursor]
+    (append-context history (fn [^WriteCursor cursor]
                               (let [tag (-> cursor .slot .tag)
                                     obj (cond
                                           (contains? #{Tag/NONE Tag/HASH_MAP} tag)
@@ -54,13 +54,13 @@
                                   (.write cursor
                                     (wtypes/slot-for-value! cursor retval))))))))
 
-(defn close-db-file! [db]
-  (let [core (-> db .-db .-core)]
+(defn- close-db-internal! [^Database db]
+  (let [core (-> db .-core)]
     (when (instance? CoreFile core)
       ;;TODO: is this the best way to do it?
       (let [field (.getDeclaredField CoreFile "file")
             _ (.setAccessible field true)
-            file (.get field core)]
+            ^RandomAccessFile file (.get field core)]
         (.close file)))))
 
 (defprotocol IHistory
@@ -72,7 +72,7 @@
 (deftype XITDBDatabase [db]
   ICloseDB
   (close-db! [this]
-    (close-db-file! this))
+    (close-db-internal! db))
 
   IHistory
   (history [this]
