@@ -3,12 +3,9 @@
     [xitdb.array-list :as xarray-list]
     [xitdb.common :as common]
     [xitdb.hash-map :as xhash-map]
-    [xitdb.linked-list :as xlinked-list]
     [xitdb.xitdb-util :as util])
   (:import
-    [io.github.radarroark.xitdb ReadArrayList ReadCursor ReadHashMap Slot Tag WriteArrayList WriteCursor WriteHashMap]
-    (xitdb.array_list XITDBArrayList)
-    (xitdb.hash_map XITDBHashMap)))
+    (io.github.radarroark.xitdb ReadCursor Slot Tag WriteCursor)))
 
 
 (defn read-from-cursor [^ReadCursor cursor for-writing?]

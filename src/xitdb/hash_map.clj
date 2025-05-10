@@ -5,6 +5,11 @@
   (:import
     (io.github.radarroark.xitdb ReadCursor ReadHashMap WriteCursor WriteHashMap)))
 
+(defn map-seq
+  [rhm]
+  "The cursors used must implement the IReadFromCursor protocol."
+  (util/map-seq rhm #(common/-read-from-cursor %)))
+
 (deftype XITDBHashMap [^ReadHashMap rhm]
   clojure.lang.ILookup
   (valAt [this key]
@@ -48,7 +53,7 @@
 
   clojure.lang.Seqable
   (seq [this]
-    (common/map-seq rhm))
+    (map-seq rhm))
 
   clojure.lang.IFn
   (invoke [this k]
@@ -81,7 +86,6 @@
   (-materialize [this]
     (reduce (fn [m [k v]]
               (assoc m k (common/materialize v))) {} (seq this))))
-
 
 ;---------------------------------------------------
 
@@ -146,7 +150,7 @@
 
   clojure.lang.Seqable
   (seq [this]
-    (common/map-seq whm))
+    (map-seq whm))
 
   common/ISlot
   (-slot [this]
@@ -156,9 +160,6 @@
   (toString [this]
     (str "XITDBWriteHashMap")))
 
-
-(defn unwrap [v]
-  v)
 
 (defn xwrite-hash-map [^WriteCursor write-cursor]
   (->XITDBWriteHashMap (WriteHashMap. write-cursor)))

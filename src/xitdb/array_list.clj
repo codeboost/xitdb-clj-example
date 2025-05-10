@@ -5,10 +5,15 @@
   (:import
     (io.github.radarroark.xitdb ReadArrayList ReadCursor WriteArrayList WriteCursor)))
 
+(defn array-seq
+  [ral]
+  "The cursors used must implement the IReadFromCursor protocol."
+  (util/array-seq ral #(common/-read-from-cursor %)))
+
 (deftype XITDBArrayList [^ReadArrayList ral]
   clojure.lang.IPersistentCollection
   (seq [_]
-    (util/array-seq ral #(common/-read-from-cursor %)))
+    (array-seq ral))
 
   (count [_]
     (.count ral))
@@ -66,7 +71,7 @@
 
   clojure.lang.IReduceInit
   (reduce [this f init]
-    (reduce f init (common/array-seq ral)))
+    (reduce f init (array-seq ral)))
 
   java.util.Collection
   (^objects toArray [this]
@@ -152,7 +157,7 @@
 
   clojure.lang.Seqable
   (seq [this]
-    (util/array-seq wal #(common/-read-from-cursor %)))
+    (array-seq wal))
 
   clojure.lang.IObj
   (withMeta [this _]
