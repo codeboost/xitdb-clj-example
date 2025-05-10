@@ -6,7 +6,7 @@
 
 (declare read-from-cursor)
 
-(deftype XITDBArrayList [ral]
+(deftype XITDBArrayList [^ReadArrayList ral]
   clojure.lang.IPersistentCollection
   (seq [_]
     (util/array-seq ral read-from-cursor))
@@ -70,14 +70,14 @@
     (reduce f init (util/array-seq ral read-from-cursor)))
 
   java.util.Collection
-  (^"[Ljava.lang.Object;" toArray [this]
+  (^objects toArray [this]
     (to-array (into [] this)))
 
-  (^"[Ljava.lang.Object;" toArray [this ^"[Ljava.lang.Object;" array]
+  (^objects toArray [this ^objects array]
     (let [len (count this)
-          result (if (or (nil? array) (< (alength array) len))
-                   (make-array Object len)
-                   array)]
+          ^objects result (if (or (nil? array) (< (alength array) len))
+                            (make-array Object len)
+                            array)]
       (dotimes [i len]
         (aset result i (nth this i)))
       (when (> (alength result) len)
@@ -92,7 +92,7 @@
   (print-method (into [] o) w))
 
 
-(deftype XITDBHashMap [rhm]
+(deftype XITDBHashMap [^ReadHashMap rhm]
   clojure.lang.ILookup
   (valAt [this key]
     (.valAt this key nil))
