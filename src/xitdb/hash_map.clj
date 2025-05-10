@@ -3,9 +3,7 @@
     [xitdb.common :as common]
     [xitdb.xitdb-util :as util])
   (:import
-    [io.github.radarroark.xitdb ReadArrayList ReadCursor ReadHashMap Slot WriteCursor WriteHashMap Tag]))
-
-(declare unwrap)
+    (io.github.radarroark.xitdb ReadCursor ReadHashMap WriteCursor WriteHashMap)))
 
 (deftype XITDBHashMap [^ReadHashMap rhm]
   clojure.lang.ILookup
@@ -50,7 +48,7 @@
 
   clojure.lang.Seqable
   (seq [this]
-    (util/map-seq rhm #(common/-read-from-cursor %)))
+    (common/map-seq rhm))
 
   clojure.lang.IFn
   (invoke [this k]
@@ -77,6 +75,15 @@
 (defmethod print-method XITDBHashMap [o ^java.io.Writer w]
   (.write w "#XITDBHashMap")
   (print-method (into {} o) w))
+
+(extend-protocol common/IMaterialize
+  XITDBHashMap
+  (-materialize [this]
+    (reduce (fn [m [k v]]
+              (assoc m k (common/materialize v))) {} (seq this))))
+
+
+;---------------------------------------------------
 
 
 (deftype XITDBWriteHashMap [whm]
@@ -109,7 +116,7 @@
                  (seq this))))
   clojure.lang.Associative
   (assoc [this k v]
-    (util/map-assoc-value! whm k (unwrap v))
+    (util/map-assoc-value! whm k v)
     this)
 
   (containsKey [this key]
@@ -139,7 +146,7 @@
 
   clojure.lang.Seqable
   (seq [this]
-    (util/map-seq whm #(common/-read-from-cursor %)))
+    (common/map-seq whm))
 
   common/ISlot
   (-slot [this]

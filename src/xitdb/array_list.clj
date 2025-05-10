@@ -3,9 +3,7 @@
     [xitdb.common :as common]
     [xitdb.xitdb-util :as util])
   (:import
-    [io.github.radarroark.xitdb ReadArrayList WriteArrayList WriteCursor ReadCursor ReadHashMap Tag]))
-
-(declare unwrap)
+    (io.github.radarroark.xitdb ReadArrayList ReadCursor WriteArrayList WriteCursor)))
 
 (deftype XITDBArrayList [^ReadArrayList ral]
   clojure.lang.IPersistentCollection
@@ -68,7 +66,7 @@
 
   clojure.lang.IReduceInit
   (reduce [this f init]
-    (reduce f init (util/array-seq ral #(common/-read-from-cursor %))))
+    (reduce f init (common/array-seq ral)))
 
   java.util.Collection
   (^objects toArray [this]
@@ -84,6 +82,7 @@
       (when (> (alength result) len)
         (aset result len nil))
       result))
+
   Object
   (toString [this]
     (pr-str (into [] this))))
@@ -92,7 +91,13 @@
   (.write w "#XITDBArrayList")
   (print-method (into [] o) w))
 
+(extend-protocol common/IMaterialize
+  XITDBArrayList
+  (-materialize [this]
+    (reduce (fn [a v]
+              (conj a (common/materialize v))) [] (seq this))))
 
+;;-----------------------------------------------
 
 (deftype XITDBWriteArrayList [^WriteArrayList wal]
   clojure.lang.IPersistentCollection
@@ -101,7 +106,7 @@
 
   (cons [this o]
     ;;TODO: Figure out if it is correct to append to the end
-    (util/array-list-assoc-value! wal (.count wal) (unwrap o))
+    (util/array-list-assoc-value! wal (.count wal) o)
     this)
 
   (empty [this]
@@ -128,7 +133,7 @@
   (assoc [this k v]
     (when-not (integer? k)
       (throw (IllegalArgumentException. "Key must be integer")))
-    (util/array-list-assoc-value! wal k (unwrap v))
+    (util/array-list-assoc-value! wal k v)
     this)
 
   (containsKey [this k]
@@ -163,7 +168,7 @@
 
   clojure.lang.ITransientCollection
   (conj [this val]
-    (util/array-list-append-value! wal (unwrap val))
+    (util/array-list-append-value! wal val)
     this)
 
   (persistent [this]
@@ -184,12 +189,7 @@
   (toString [this]
     (str "XITDBWriteArrayList")))
 
-(defn unwrap [v]
-  (cond
-    (instance? XITDBWriteArrayList v)
-    (.-wal ^XITDBWriteArrayList v)
-    :else
-    v))
+;; Constructors
 
 (defn xwrite-array-list [^WriteCursor write-cursor]
   (->XITDBWriteArrayList (WriteArrayList. write-cursor)))
