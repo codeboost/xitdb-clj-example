@@ -2,7 +2,7 @@
   (:require
     [xitdb.xitdb-util :as util])
   (:import
-    (io.github.radarroark.xitdb Tag WriteArrayList WriteCursor WriteHashMap)))
+    (io.github.radarroark.xitdb Slot Tag WriteArrayList WriteCursor WriteHashMap)))
 
 (declare read-from-cursor unwrap)
 (declare ->XITDBWriteArrayList)
@@ -116,7 +116,7 @@
     this)
 
   (empty [this]
-    (.write (-> whm .cursor) (util/v->slot! (-> whm .cursor) {}))
+    (util/map-empty! whm)
     this)
 
   (equiv [this other]
@@ -129,7 +129,7 @@
     this)
 
   (containsKey [this key]
-    (not (nil? (.getCursor whm (util/keyname key)))))
+    (util/map-contains-key? whm key))
 
   (entryAt [this key]
     (when (.containsKey this key)
@@ -141,17 +141,17 @@
     this)
 
   (count [this]
-    (.valAt this (util/internal-keys :count) 0))
+    (util/map-item-count whm))
 
   clojure.lang.ILookup
   (valAt [this key]
     (.valAt this key nil))
 
   (valAt [this key not-found]
-    (let [cursor (.getCursor whm (util/keyname key))]
+    (let [cursor (util/map-read-cursor whm key)]
       (if (nil? cursor)
         not-found
-        (read-from-cursor (.putCursor whm (util/db-key key))))))
+        (read-from-cursor (util/map-write-cursor whm key)))))
 
   clojure.lang.Seqable
   (seq [this]
@@ -189,20 +189,23 @@
 (defn unwrap [v]
   (cond
     (instance? XITDBWriteArrayList v)
-    (.-wal v)
+    (.-wal ^XITDBWriteArrayList v)
 
     (instance? XITDBWriteHashMap v)
-    (.-whm v)
+    (.-whm ^XITDBWriteHashMap v)
 
     :else
     v))
 
-(defn slot-for-value! [^WriteCursor cursor v]
+(defn ^Slot slot-for-value! [^WriteCursor cursor v]
   (cond
     (instance? XITDBWriteArrayList v)
-    (-> v .wal .cursor .slot)
+    (let [^WriteArrayList wal  (.-wal ^XITDBWriteArrayList v)]
+      (-> wal .cursor .slot))
 
     (instance? XITDBWriteHashMap v)
-    (-> v .whm .cursor .slot)
+    (let [^WriteHashMap whm (.-whm ^XITDBWriteHashMap v)]
+      (-> whm .cursor .slot))
+
     :else
     (util/v->slot! cursor v)))

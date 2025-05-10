@@ -41,7 +41,7 @@
 (declare ^WriteCursor map->WriteHashMapCursor!)
 (declare ^WriteCursor coll->ArrayListCursor!)
 
-(defn keyname [key]
+(defn ^String keyname [key]
   (if (keyword? key)
     (if (namespace key)
       (str (namespace key) "/" (name key))
@@ -162,7 +162,7 @@
     :else
     (primitive-for k)))
 
-(defn update-map-item-count! [^WriteHashMap whm f]
+(defn- update-map-item-count! [^WriteHashMap whm f]
   (let [count-cursor (.putCursor whm (db-key (internal-keys :count)))
         value (try
                 (.readInt count-cursor)
@@ -191,6 +191,23 @@
     (when-not existing
       (update-map-item-count! whm inc))
     whm))
+
+(defn map-empty! [^WriteHashMap whm]
+  (let [^WriteCursor cursor (-> whm .cursor)]
+    (.write cursor (v->slot! cursor {}))))
+
+(defn map-contains-key? [^WriteHashMap whm key]
+  (not (nil? (.getCursor whm (keyname key)))))
+
+(defn map-item-count [^ReadHashMap rhm]
+  (let [count-cursor (.getCursor rhm (db-key (internal-keys :count)))]
+    (.readInt count-cursor)))
+
+(defn map-read-cursor [^ReadHashMap rhm key]
+  (.getCursor rhm (keyname key)))
+
+(defn map-write-cursor [^WriteHashMap whm key]
+  (.putCursor whm (db-key key)))
 
 (defn coll->ArrayListCursor!
   "Converts a Clojure collection to a XitDB ArrayList cursor.
