@@ -2,24 +2,9 @@
   (:require
     [clojure.test :refer :all]
     [xitdb.db :as xdb]
-    [xitdb.xitdb-types :as types])
-  (:import (xitdb.xitdb_types XITDBArrayList XITDBHashMap)))
+    [xitdb.xitdb-types :as types]))
 
-
-(defn materialize
-  "Converts a xitdb data structure `v` to a clojure data structure.
-  This has the effect of reading the whole data structure into memory."
-  [v]
-  (cond
-    (instance? XITDBArrayList v)
-    (reduce (fn [a v]
-              (conj a (materialize v))) [] (seq v))
-
-    (instance? XITDBHashMap v)
-    (reduce (fn [m [k v]]
-              (assoc m k (materialize v))) {} (seq v))
-    :else
-    v))
+(def materialize types/materialize)
 
 (defprotocol DbEqualToAtom
   (db-equal-to-atom? [this]))
@@ -27,7 +12,7 @@
 (deftype DBWithAtom [db test-atom]
   DbEqualToAtom
   (db-equal-to-atom? [this]
-    (= (materialize @db) @test-atom))
+    (= (types/materialize @db) @test-atom))
 
   xdb/ICloseDB
   (close-db! [this]
@@ -35,7 +20,7 @@
 
   clojure.lang.IDeref
   (deref [_]
-    (materialize
+    (types/materialize
       (deref db)))
 
   clojure.lang.IAtom
@@ -87,3 +72,4 @@
          ~@body
          (finally
            (xdb/close-db! ~db-name))))))
+

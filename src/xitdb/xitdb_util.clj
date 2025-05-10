@@ -1,6 +1,6 @@
 (ns xitdb.xitdb-util
   (:import
-    [io.github.radarroark.xitdb Database$Float Database$Bytes Database$Int Database$Uint ReadArrayList ReadCursor ReadHashMap Slot WriteArrayList WriteCursor WriteHashMap Tag]))
+    [io.github.radarroark.xitdb Database$Float Database$Bytes Database$Int Database$Uint ReadArrayList ReadCursor ReadHashMap ReadLinkedArrayList Slot WriteArrayList WriteCursor WriteHashMap Tag WriteLinkedArrayList]))
 
 (defn xit-tag->keyword
   "Converts a XitDB Tag enum to a corresponding Clojure keyword."
@@ -40,6 +40,7 @@
 
 (declare ^WriteCursor map->WriteHashMapCursor!)
 (declare ^WriteCursor coll->ArrayListCursor!)
+(declare ^WriteCursor coll->WriteCursor!)
 
 (defn ^String keyname [key]
   (if (keyword? key)
@@ -100,6 +101,9 @@
     (instance? WriteArrayList v)
     (-> ^WriteArrayList v .-cursor .slot)
 
+    (instance? WriteLinkedArrayList v)
+    (-> ^WriteLinkedArrayList v .-cursor .slot)
+
     (instance? WriteHashMap v)
     (-> ^WriteHashMap v .-cursor .slot)
 
@@ -151,6 +155,24 @@
 (defn array-list-empty! [^WriteArrayList wal]
   (let [^WriteCursor cursor (-> wal .cursor)]
     (.write cursor (v->slot! cursor []))))
+
+(defn ^WriteLinkedArrayList linked-array-list-append-value!
+  "Appends a value to a WriteLinkedArrayList.
+  Converts the value to an appropriate XitDB representation using v->slot!."
+  [^WriteLinkedArrayList wlal v]
+  (let [cursor (.appendCursor wlal)]
+    (.write cursor (v->slot! cursor v))
+    wlal))
+
+(defn ^WriteLinkedArrayList linked-array-list-append-all!
+  "Appends multiple values to a WriteLinkedArrayList.
+  Each value is processed and appended individually, avoiding loading all
+  values into memory at once."
+  [^WriteLinkedArrayList wlal values]
+  (doseq [v values]
+    (let [cursor (.appendCursor wlal)]
+      (.write cursor (v->slot! cursor v))))
+  wlal)
 
 (defn ^Database$Bytes db-key
   "Converts k from a Clojure type to a Database$Bytes representation to be used in
@@ -229,6 +251,29 @@
         (.append write-array (primitive-for v))))
     (.-cursor write-array)))
 
+(defn ^WriteCursor coll->WriteCursor!
+  "Converts a Clojure list or seq-like collection to a XitDB LinkedArrayList cursor.
+   Optimized for sequential access collections rather than random access ones."
+  [cursor coll]
+  (let [write-list (if (or (list? coll) (instance? clojure.lang.LazySeq coll))
+                     (WriteLinkedArrayList. cursor)
+                     (WriteArrayList. cursor))]
+    (doseq [v coll]
+      (let [v-cursor (.appendCursor write-list)]
+        (cond
+          (map? v)
+          (map->WriteHashMapCursor! v-cursor v)
+
+          (or (list? v) (instance? clojure.lang.LazySeq v))
+          (coll->WriteCursor! v-cursor v)
+
+          (coll? v)
+          (coll->ArrayListCursor! v-cursor v)
+
+          :else
+          (.write cursor (primitive-for v)))))
+    (.-cursor write-list)))
+
 (defn ^WriteCursor map->WriteHashMapCursor!
   "Writes a Clojure map to a XitDB WriteHashMap.
   Returns the cursor of the created WriteHashMap."
@@ -284,7 +329,7 @@
                         (cons (clojure.lang.MapEntry. k v) (step))))))))]
       (step))))
 
-(defn array-seq [^ReadArrayList ral read-from-cursor]
+(defn array-seq [ral read-from-cursor]
   (let [iter (.iterator ral)
         lazy-iter (fn lazy-iter []
                     (when (.hasNext iter)

@@ -1,8 +1,6 @@
 (ns xitdb.db
   (:require
     [xitdb.xitdb-types :as xtypes]
-
-    [xitdb.xitdb-write-types :as wtypes]
     [xitdb.xitdb-util :as util])
   (:import
     [io.github.radarroark.xitdb
@@ -43,16 +41,12 @@
 (defn xitdb-swap! [db f & args]
   (let [history (db-history db)]
     (append-context history (fn [^WriteCursor cursor]
-                              (let [tag (-> cursor .slot .tag)
-                                    obj (cond
-                                          (contains? #{Tag/NONE Tag/HASH_MAP} tag)
-                                          (wtypes/->XITDBWriteHashMap (WriteHashMap. cursor))
-
-                                          (= Tag/ARRAY_LIST tag)
-                                          (wtypes/->XITDBWriteArrayList (WriteArrayList. cursor)))]
+                              (let [obj (xtypes/read-from-cursor cursor true)]
                                 (let [retval (apply f (concat [obj] args))]
-                                  (.write cursor
-                                    (wtypes/slot-for-value! cursor retval))))))))
+                                  (println "writing to cursor: " (type retval))
+                                  (time
+                                    (.write cursor
+                                      (xtypes/slot-for-value! cursor retval)))))))))
 
 (defn- close-db-internal! [^Database db]
   (let [core (-> db .-core)]
@@ -82,7 +76,7 @@
   (deref [_]
     (let [history (db-history db)
           cursor (.getCursor history -1)]
-      (xtypes/read-from-cursor cursor)))
+      (xtypes/read-from-cursor cursor false)))
 
   clojure.lang.IAtom
   (reset [this new-value]
