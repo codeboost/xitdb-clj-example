@@ -3,6 +3,7 @@
     [xitdb.array-list :as xarray-list]
     [xitdb.common :as common]
     [xitdb.hash-map :as xhash-map]
+    [xitdb.linked-list :as xlinked-list]
     [xitdb.xitdb-util :as util])
   (:import
     (io.github.radarroark.xitdb ReadCursor Slot Tag WriteCursor)))
@@ -32,6 +33,11 @@
       (if for-writing?
         (xarray-list/xwrite-array-list cursor)
         (xarray-list/xarray-list cursor))
+
+      (= value-tag Tag/LINKED_ARRAY_LIST)
+      (if for-writing?
+        (xlinked-list/xwrite-linked-list cursor)
+        (xlinked-list/xlinked-list cursor))
 
       :else
       nil)))

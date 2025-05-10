@@ -164,6 +164,9 @@
     (.write cursor (v->slot! cursor v))
     wlal))
 
+(defn ^WriteLinkedArrayList linked-list-insert-value!
+  [^WriteLinkedArrayList wlal v])
+
 (defn ^WriteLinkedArrayList linked-array-list-append-all!
   "Appends multiple values to a WriteLinkedArrayList.
   Each value is processed and appended individually, avoiding loading all
@@ -255,23 +258,25 @@
   "Converts a Clojure list or seq-like collection to a XitDB LinkedArrayList cursor.
    Optimized for sequential access collections rather than random access ones."
   [cursor coll]
-  (let [write-list (if (or (list? coll) (instance? clojure.lang.LazySeq coll))
+  (let [write-list (if (list? coll)
                      (WriteLinkedArrayList. cursor)
                      (WriteArrayList. cursor))]
+    (println "write-list:" write-list)
     (doseq [v coll]
       (let [v-cursor (.appendCursor write-list)]
         (cond
           (map? v)
           (map->WriteHashMapCursor! v-cursor v)
 
-          (or (list? v) (instance? clojure.lang.LazySeq v))
+          ;(or (list? v) (instance? clojure.lang.LazySeq v))
+          (list? v)
           (coll->WriteCursor! v-cursor v)
 
           (coll? v)
-          (coll->ArrayListCursor! v-cursor v)
+          (coll->WriteCursor! v-cursor v)
 
           :else
-          (.write cursor (primitive-for v)))))
+          (.append write-list (primitive-for v)))))
     (.-cursor write-list)))
 
 (defn ^WriteCursor map->WriteHashMapCursor!

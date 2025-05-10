@@ -6,10 +6,15 @@
     [io.github.radarroark.xitdb ReadLinkedArrayList ReadCursor ReadHashMap Tag
                                 Slot WriteLinkedArrayList WriteCursor]))
 
+(defn array-seq
+  [^ReadLinkedArrayList rlal]
+  "The cursors used must implement the IReadFromCursor protocol."
+  (util/array-seq rlal #(common/-read-from-cursor %)))
+
 (deftype XITDBLinkedArrayList [^ReadLinkedArrayList rlal]
   clojure.lang.IPersistentCollection
   (seq [_]
-    (util/array-seq rlal #(common/-read-from-cursor (-> rlal .cursor))))
+    (array-seq rlal))
 
   (count [_]
     (.count rlal))
@@ -67,7 +72,7 @@
 
   clojure.lang.IReduceInit
   (reduce [this f init]
-    (reduce f init (util/array-seq rlal #(common/-read-from-cursor (-> rlal .cursor)))))
+    (reduce f init (array-seq rlal)))
 
   java.util.Collection
   (^objects toArray [this]
@@ -92,8 +97,13 @@
   (.write w "#XITDBLinkedArrayList")
   (print-method (into [] o) w))
 
-;; Write version
-(declare unwrap)
+(extend-protocol common/IMaterialize
+  XITDBLinkedArrayList
+  (-materialize [this]
+    (reduce (fn [a v]
+              (conj a (common/materialize v))) [] (seq this))))
+
+;; -----------------------------------------------------------------
 
 (deftype XITDBWriteLinkedArrayList [^WriteLinkedArrayList wlal]
   clojure.lang.IPersistentCollection
@@ -101,13 +111,14 @@
     (.count wlal))
 
   (cons [this o]
-    (util/linked-array-list-append-value! wlal (unwrap o))
+    ;; TODO: This should insert at position 0
+    (util/linked-array-list-append-value! wlal o)
     this)
 
   (empty [this]
     ;; Assuming similar empty behavior as arrays
     (let [^WriteCursor cursor (-> wlal .cursor)]
-      (.write cursor (util/v->slot! cursor [])))
+      (.write cursor (util/v->slot! cursor (list))))
     this)
 
   (equiv [this other]
@@ -151,7 +162,7 @@
 
   clojure.lang.Seqable
   (seq [this]
-    (util/array-seq wlal #(common/-read-from-cursor (-> wlal .cursor))))
+    (array-seq wlal))
 
   clojure.lang.IObj
   (withMeta [this _]
@@ -167,7 +178,7 @@
 
   clojure.lang.ITransientCollection
   (conj [this val]
-    (util/linked-array-list-append-value! wlal (unwrap val))
+    (util/linked-array-list-append-value! wlal val)
     this)
 
   (persistent [this]
@@ -182,5 +193,10 @@
     (str "XITDBWriteLinkedArrayList")))
 
 
-(defn unwrap [v]
-  v)
+;; Constructors
+
+(defn xlinked-list [^ReadCursor cursor]
+  (->XITDBLinkedArrayList (ReadLinkedArrayList. cursor)))
+
+(defn xwrite-linked-list [^WriteCursor write-cursor]
+  (->XITDBWriteLinkedArrayList (WriteLinkedArrayList. write-cursor)))

@@ -6,7 +6,7 @@
     (io.github.radarroark.xitdb ReadArrayList ReadCursor WriteArrayList WriteCursor)))
 
 (defn array-seq
-  [ral]
+  [^ReadArrayList ral]
   "The cursors used must implement the IReadFromCursor protocol."
   (util/array-seq ral #(common/-read-from-cursor %)))
 
