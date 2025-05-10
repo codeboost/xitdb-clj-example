@@ -1,6 +1,6 @@
 (ns xitdb.xitdb-util
   (:import
-    [io.github.radarroark.xitdb Database$Float Database$Bytes Database$Int Database$Uint WriteArrayList WriteHashMap Tag]))
+    [io.github.radarroark.xitdb Database$Float Database$Bytes Database$Int Database$Uint ReadArrayList ReadCursor ReadHashMap Slot WriteArrayList WriteCursor WriteHashMap Tag]))
 
 (defn xit-tag->keyword
   "Converts a XitDB Tag enum to a corresponding Clojure keyword."
@@ -38,8 +38,8 @@
 ;; HashMap keys which are used internally and should be hidden from user
 (def hidden-keys (set (vals internal-keys)))
 
-(declare map->WriteHashMapCursor!)
-(declare coll->ArrayListCursor!)
+(declare ^WriteCursor map->WriteHashMapCursor!)
+(declare ^WriteCursor coll->ArrayListCursor!)
 
 (defn keyname [key]
   (if (keyword? key)
@@ -48,7 +48,14 @@
       (name key))
     key))
 
-(defn primitive-for
+(defn ^Database$Bytes database-bytes
+  ([^String s]
+   (Database$Bytes. s))
+  ([^String s ^String tag]
+   (Database$Bytes. s tag)))
+
+
+(defn ^Slot primitive-for
   "Converts a Clojure primitive value to its corresponding XitDB representation.
   Handles strings, keywords, integers, booleans, and floats.
   Throws an IllegalArgumentException for unsupported types."
@@ -56,46 +63,45 @@
   (cond
 
     (string? v)
-    (Database$Bytes. ^String v)
+    (database-bytes v)
 
     (keyword? v)
-    (Database$Bytes. (keyname v) (fmt-tag-value :keyword))
-
+    (database-bytes (keyname v) (fmt-tag-value :keyword))
 
     (integer? v)
     (Database$Int. v)
 
     (boolean? v)
-    (Database$Bytes. (if v true-str false-str) (fmt-tag-value :boolean))
+    (database-bytes (if v true-str false-str) (fmt-tag-value :boolean))
 
     (double? v)
     (Database$Float. v)
 
     (nil? v)
-    (Database$Bytes. "" (fmt-tag-value :nil))
+    (database-bytes "" (fmt-tag-value :nil))
 
     (instance? java.time.Instant v)
-    (Database$Bytes. (str v) (fmt-tag-value :inst))
+    (database-bytes (str v) (fmt-tag-value :inst))
 
     (instance? java.util.Date v)
-    (Database$Bytes. (str (.toInstant v)) (fmt-tag-value :date))
+    (database-bytes (str (.toInstant ^java.util.Date v)) (fmt-tag-value :date))
 
     :else
     (throw (IllegalArgumentException. (str "Unsupported type: " (type v) v)))))
 
-(defn v->slot!
+(defn ^Slot v->slot!
   "Converts a value to a XitDB slot.
   Handles WriteArrayList and WriteHashMap instances directly.
   Recursively processes Clojure maps and collections.
   Falls back to primitive conversion for other types."
-  [cursor v]
+  [^WriteCursor cursor v]
   (cond
 
     (instance? WriteArrayList v)
-    (-> v .-cursor .slot)
+    (-> ^WriteArrayList v .-cursor .slot)
 
     (instance? WriteHashMap v)
-    (-> v .-cursor .slot)
+    (-> ^WriteHashMap v .-cursor .slot)
 
     (map? v)
     (do
@@ -109,12 +115,20 @@
     :else
     (primitive-for v)))
 
-(defn array-list-assoc-value!
+(defn ^WriteArrayList array-list-append-value!
+  "Appends a value to a WriteArrayList.
+  Converts the value to an appropriate XitDB representation using v->slot!."
+  [^WriteArrayList wal v]
+  (let [cursor (.appendCursor wal)]
+    (.write cursor (v->slot! cursor v))
+    wal))
+
+(defn ^WriteArrayList array-list-assoc-value!
   "Associates a value at index i in a WriteArrayList.
   Appends the value if the index equals the current count.
   Replaces the value at the specified index otherwise.
   Throws an IllegalArgumentException if the index is out of bounds."
-  [wal i v]
+  [^WriteArrayList wal i v]
 
   (assert (= Tag/ARRAY_LIST (-> wal .cursor .slot .tag)))
   (assert (number? i))
@@ -125,19 +139,27 @@
   (let [cursor (if (= i (.count wal))
                  (.appendCursor wal)
                  (.putCursor wal i))]
-    (.write cursor (v->slot! cursor v))))
+    (.write cursor (v->slot! cursor v)))
+  wal)
 
-(defn db-key
+(defn array-list-pop! [^WriteArrayList wal]
+  (when (zero? (.count wal))
+    (throw (IllegalStateException. "Can't pop empty array")))
+
+  (.slice wal (dec (.count wal))))
+
+
+(defn ^Database$Bytes db-key
   "Converts k from a Clojure type to a Database$Bytes representation to be used in
   cursor functions."
   [k]
   (cond
     (integer? k)
-    (Database$Bytes. (str k) "ki") ;integer keys are stored as strings with 'ki' format tag
+    (database-bytes (str k) "ki") ;integer keys are stored as strings with 'ki' format tag
     :else
     (primitive-for k)))
 
-(defn update-map-item-count! [whm f]
+(defn update-map-item-count! [^WriteHashMap whm f]
   (let [count-cursor (.putCursor whm (db-key (internal-keys :count)))
         value (try
                 (.readInt count-cursor)
@@ -146,7 +168,7 @@
     (.write count-cursor new-value)))
 
 (defn map-dissoc-key!
-  [whm k]
+  [^WriteHashMap whm k]
   (when (contains? hidden-keys k)
     (throw (IllegalArgumentException. (str "Cannot dissoc key. " k ". It is reserved for internal use."))))
 
@@ -156,7 +178,7 @@
 (defn map-assoc-value!
   "Associates a key-value pair in a WriteHashMap.
   Converts the key to a string and the value to an appropriate XitDB representation."
-  [whm k v]
+  [^WriteHashMap whm k v]
   (when (contains? hidden-keys k)
     (throw (IllegalArgumentException. (str "Cannot assoc key. " k ". It is reserved for internal use."))))
 
@@ -187,16 +209,16 @@
         (.append write-array (primitive-for v))))
     (.-cursor write-array)))
 
-(defn map->WriteHashMapCursor!
+(defn ^WriteCursor map->WriteHashMapCursor!
   "Writes a Clojure map to a XitDB WriteHashMap.
   Returns the cursor of the created WriteHashMap."
-  [cursor m]
+  [^WriteCursor cursor m]
   (let [whm (WriteHashMap. cursor)]
     (doseq [[k v] m]
       (map-assoc-value! whm k v))
     (.-cursor whm)))
 
-(defn read-bytes-with-format-tag [cursor]
+(defn read-bytes-with-format-tag [^ReadCursor cursor]
   (let [bytes-obj (.readBytesObject cursor nil)
         str (String. (.value bytes-obj))
         fmt-tag (some-> bytes-obj .formatTag String.)]
@@ -228,7 +250,7 @@
 
 (defn map-seq
   "Return a lazy seq of key-value MapEntry pairs, skipping hidden keys."
-  [rhm read-from-cursor]
+  [^ReadHashMap rhm read-from-cursor]
   (let [it (.iterator rhm)]
     (letfn [(step []
               (lazy-seq
@@ -242,7 +264,7 @@
                         (cons (clojure.lang.MapEntry. k v) (step))))))))]
       (step))))
 
-(defn array-seq [ral read-from-cursor]
+(defn array-seq [^ReadArrayList ral read-from-cursor]
   (let [iter (.iterator ral)
         lazy-iter (fn lazy-iter []
                     (when (.hasNext iter)
