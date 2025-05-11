@@ -188,6 +188,10 @@
   (-slot [this]
     (-> wlal .cursor .slot))
 
+  common/IUnwrap
+  (-unwrap [this]
+    wlal)
+
   Object
   (toString [this]
     (str "XITDBWriteLinkedArrayList")))

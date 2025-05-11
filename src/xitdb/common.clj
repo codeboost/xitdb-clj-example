@@ -11,8 +11,16 @@
 (defprotocol IMaterialize
   (-materialize [this]))
 
+(defprotocol IUnwrap
+  (-unwrap [this]))
+
 
 (defn materialize [v]
   (if (satisfies? IMaterialize v)
     (-materialize v)
+    v))
+
+(defn unwrap [v]
+  (if (satisfies? IUnwrap v)
+    (-unwrap v)
     v))

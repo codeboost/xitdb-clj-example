@@ -120,7 +120,7 @@
                  (seq this))))
   clojure.lang.Associative
   (assoc [this k v]
-    (util/map-assoc-value! whm k v)
+    (util/map-assoc-value! whm k (common/unwrap v))
     this)
 
   (containsKey [this key]
@@ -155,6 +155,10 @@
   common/ISlot
   (-slot [this]
     (-> whm .cursor .slot))
+
+  common/IUnwrap
+  (-unwrap [this]
+    whm)
 
   Object
   (toString [this]

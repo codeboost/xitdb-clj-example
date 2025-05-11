@@ -111,7 +111,7 @@
 
   (cons [this o]
     ;;TODO: Figure out if it is correct to append to the end
-    (util/array-list-assoc-value! wal (.count wal) o)
+    (util/array-list-assoc-value! wal (.count wal) (common/unwrap o))
     this)
 
   (empty [this]
@@ -138,7 +138,7 @@
   (assoc [this k v]
     (when-not (integer? k)
       (throw (IllegalArgumentException. "Key must be integer")))
-    (util/array-list-assoc-value! wal k v)
+    (util/array-list-assoc-value! wal k (common/unwrap v))
     this)
 
   (containsKey [this k]
@@ -173,7 +173,7 @@
 
   clojure.lang.ITransientCollection
   (conj [this val]
-    (util/array-list-append-value! wal val)
+    (util/array-list-append-value! wal (common/unwrap val))
     this)
 
   (persistent [this]
@@ -189,6 +189,10 @@
   common/ISlot
   (-slot [this]
     (-> wal .cursor .slot))
+
+  common/IUnwrap
+  (-unwrap [this]
+    wal)
 
   Object
   (toString [this]
