@@ -7,11 +7,11 @@
 (def materialize types/materialize)
 
 (defprotocol DbEqualToAtom
-  (db-equal-to-atom? [this]))
+  (-db-equal-to-atom? [this]))
 
 (deftype DBWithAtom [db test-atom]
   DbEqualToAtom
-  (db-equal-to-atom? [this]
+  (-db-equal-to-atom? [this]
     (= (types/materialize @db) @test-atom))
 
   xdb/ICloseDB
@@ -46,6 +46,12 @@
 (defn instrumented-db [db]
   (let [a (atom nil)]
     (->DBWithAtom db a)))
+
+(defn db-equal-to-atom?
+  [db]
+  (if (satisfies? DbEqualToAtom db)
+    (-db-equal-to-atom? db)
+    true))
 
 (def test-source :memory) ;; :memory or filename
 

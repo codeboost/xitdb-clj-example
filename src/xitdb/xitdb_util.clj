@@ -194,13 +194,39 @@
     :else
     (primitive-for k)))
 
-(defn- update-map-item-count! [^WriteHashMap whm f]
-  (let [count-cursor (.putCursor whm (db-key (internal-keys :count)))
-        value (try
-                (.readInt count-cursor)
-                (catch Exception _ 0))
-        new-value (primitive-for (f (or value 0)))]
-    (.write count-cursor new-value)))
+(def ^:dynamic *enable-map-fast-count?* false)
+
+(defn- update-map-item-count!
+  "Update the internal key `:count` by applying `f` to the current value.
+  If the key `:count` does not exist, it is created."
+  [^WriteHashMap whm f]
+  (when *enable-map-fast-count?*
+    (let [count-cursor (.putCursor whm (db-key (internal-keys :count)))
+          value (try
+                  (.readInt count-cursor)
+                  (catch Exception _ 0))
+          new-value (primitive-for (f (or value 0)))]
+      (.write count-cursor new-value))))
+
+(defn- map-item-count-stored
+  "Returns the value of the internal key `:count`."
+  [^ReadHashMap rhm]
+  (let [count-cursor (.getCursor rhm (db-key (internal-keys :count)))]
+    (.readInt count-cursor)))
+
+(defn map-assoc-value!
+  "Associates a key-value pair in a WriteHashMap.
+  Converts the key to a string and the value to an appropriate XitDB representation."
+  [^WriteHashMap whm k v]
+  (when (contains? hidden-keys k)
+    (throw (IllegalArgumentException. (str "Cannot assoc key. " k ". It is reserved for internal use."))))
+
+  (let [cursor (.putCursor whm (db-key k))
+        new? (= (-> cursor .slot .tag) Tag/NONE)]
+    (.write cursor (v->slot! cursor v))
+    (when new?
+      (update-map-item-count! whm inc))
+    whm))
 
 (defn map-dissoc-key!
   [^WriteHashMap whm k]
@@ -210,20 +236,6 @@
   (when (.remove whm (db-key k))
     (update-map-item-count! whm dec)))
 
-(defn map-assoc-value!
-  "Associates a key-value pair in a WriteHashMap.
-  Converts the key to a string and the value to an appropriate XitDB representation."
-  [^WriteHashMap whm k v]
-  (when (contains? hidden-keys k)
-    (throw (IllegalArgumentException. (str "Cannot assoc key. " k ". It is reserved for internal use."))))
-
-  (let [existing (.getCursor whm (db-key k))
-        cursor (.putCursor whm (db-key k))]
-    (.write cursor (v->slot! cursor v))
-    (when-not existing
-      (update-map-item-count! whm inc))
-    whm))
-
 (defn map-empty! [^WriteHashMap whm]
   (let [^WriteCursor cursor (-> whm .cursor)]
     (.write cursor (v->slot! cursor {}))))
@@ -231,9 +243,24 @@
 (defn map-contains-key? [^WriteHashMap whm key]
   (not (nil? (.getCursor whm (keyname key)))))
 
-(defn map-item-count [^ReadHashMap rhm]
-  (let [count-cursor (.getCursor rhm (db-key (internal-keys :count)))]
-    (.readInt count-cursor)))
+(defn map-item-count-iterated
+  "Returns the number of keys in the map by iterating.
+  The count includes internal keys if any."
+  [^ReadHashMap rhm]
+  (let [it (.iterator rhm)]
+    (loop [cnt 0]
+      (if (.hasNext it)
+        (do
+          (.next it)
+          (recur (inc cnt)))
+        cnt))))
+
+(defn map-item-count
+  "Returns the number of key/vals in the map."
+  [^ReadHashMap rhm]
+  (if *enable-map-fast-count?*
+    (map-item-count-stored rhm)
+    (map-item-count-iterated rhm)))
 
 (defn map-read-cursor [^ReadHashMap rhm key]
   (.getCursor rhm (keyname key)))
@@ -268,7 +295,6 @@
   (let [write-list (if (list? coll)
                      (WriteLinkedArrayList. cursor)
                      (WriteArrayList. cursor))]
-    (println "write-list:" write-list)
     (doseq [v coll]
       (let [v-cursor (.appendCursor write-list)]
         (cond

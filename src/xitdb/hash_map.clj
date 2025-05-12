@@ -38,7 +38,7 @@
     (throw (UnsupportedOperationException. "XITDBHashMap is read-only")))
 
   (count [this]
-    (.valAt this (util/internal-keys :count) 0))
+    (util/map-item-count rhm))
 
   clojure.lang.IPersistentCollection
   (cons [_ _]

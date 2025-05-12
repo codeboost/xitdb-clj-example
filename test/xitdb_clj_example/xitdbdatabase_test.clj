@@ -360,9 +360,8 @@
 
     (is (tu/db-equal-to-atom? db))))
 
-
 (deftest CountTest
-  (with-db [db (tu/test-db)]
+  (with-db [db (tu/test-memory-db-raw)]
     (reset! db {:a :b :c :d :e :f})
     (is (= 3 (count @db)))
 
@@ -417,6 +416,8 @@
 (deftest IntoEfficiency
   (with-db [db (tu/test-db)]
     (reset! db [1 2 3])
-    (swap! db into [4 5])))
+    (swap! db into [4 5])
+    (swap! db into [5 6])
+    (is (= [1 2 3 4 5 5 6] @db))))
 
 
