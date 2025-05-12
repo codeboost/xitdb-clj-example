@@ -73,6 +73,11 @@
         (remove [_]
           (throw (UnsupportedOperationException. "XITDBHashMap iterator is read-only"))))))
 
+
+  common/IUnwrap
+  (-unwrap [this]
+    rhm)
+
   Object
   (toString [this]
     (str (into {} this))))

@@ -88,6 +88,11 @@
         (aset result len nil))
       result))
 
+
+  common/IUnwrap
+  (-unwrap [this]
+    ral)
+
   Object
   (toString [this]
     (pr-str (into [] this))))

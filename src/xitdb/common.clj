@@ -20,7 +20,9 @@
     (-materialize v)
     v))
 
-(defn unwrap [v]
+(defn unwrap
+  "For a value that wraps another value, returns the wrapped value."
+  [v]
   (if (satisfies? IUnwrap v)
     (-unwrap v)
     v))

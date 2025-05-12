@@ -99,13 +99,20 @@
   (cond
 
     (instance? WriteArrayList v)
-    (-> ^WriteArrayList v .-cursor .slot)
+    (-> ^WriteArrayList v .cursor .slot)
 
     (instance? WriteLinkedArrayList v)
-    (-> ^WriteLinkedArrayList v .-cursor .slot)
+    (-> ^WriteLinkedArrayList v .cursor .slot)
 
     (instance? WriteHashMap v)
-    (-> ^WriteHashMap v .-cursor .slot)
+    (-> ^WriteHashMap v .cursor .slot)
+
+    ;;TODO: Confirm that it is correct to return the Read slots
+    (instance? ReadHashMap v)
+    (-> ^ReadHashMap v .cursor .slot)
+
+    (instance? ReadArrayList v)
+    (-> ^ReadArrayList v .cursor .slot)
 
     (map? v)
     (do

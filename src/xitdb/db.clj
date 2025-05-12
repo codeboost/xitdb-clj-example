@@ -43,10 +43,7 @@
     (append-context history (fn [^WriteCursor cursor]
                               (let [obj (xtypes/read-from-cursor cursor true)]
                                 (let [retval (apply f (concat [obj] args))]
-                                  (println "writing to cursor: " (type retval))
-                                  (time
-                                    (.write cursor
-                                      (xtypes/slot-for-value! cursor retval)))))))))
+                                  (.write cursor (xtypes/slot-for-value! cursor retval))))))))
 
 (defn- close-db-internal! [^Database db]
   (let [core (-> db .-core)]
