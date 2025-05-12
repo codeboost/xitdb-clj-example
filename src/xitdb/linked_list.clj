@@ -9,7 +9,7 @@
 (defn array-seq
   [^ReadLinkedArrayList rlal]
   "The cursors used must implement the IReadFromCursor protocol."
-  (util/array-seq rlal #(common/-read-from-cursor %)))
+  (util/linked-array-seq rlal #(common/-read-from-cursor %)))
 
 (deftype XITDBLinkedArrayList [^ReadLinkedArrayList rlal]
   clojure.lang.IPersistentCollection
@@ -112,7 +112,7 @@
 
   (cons [this o]
     ;; TODO: This should insert at position 0
-    (util/linked-array-list-append-value! wlal o)
+    (util/linked-array-list-insert-value! wlal 0 (common/unwrap o))
     this)
 
   (empty [this]
@@ -178,11 +178,26 @@
 
   clojure.lang.ITransientCollection
   (conj [this val]
-    (util/linked-array-list-append-value! wlal val)
+    (util/linked-array-list-append-value! wlal (common/unwrap val))
     this)
 
   (persistent [this]
     this)
+
+  clojure.lang.IPersistentStack
+  (peek [this]
+    (if (pos? (.count wlal))
+      (common/-read-from-cursor (.getCursor wlal 0))
+      nil))
+
+  (pop [this]
+    (if (pos? (.count wlal))
+      (util/linked-array-list-pop! wlal)
+      (throw (IllegalStateException. "Can't pop empty list")))
+    this)
+
+  clojure.lang.IPersistentList
+  ;; No additional methods needed, IPersistentList just extends IPersistentStack
 
   common/ISlot
   (-slot [this]
@@ -196,6 +211,12 @@
   (toString [this]
     (str "XITDBWriteLinkedArrayList")))
 
+(extend-protocol common/IMaterialize
+  XITDBLinkedArrayList
+  (-materialize [this]
+    (apply list
+      (reduce (fn [a v]
+                (conj a (common/materialize v))) [] (seq this)))))
 
 ;; Constructors
 

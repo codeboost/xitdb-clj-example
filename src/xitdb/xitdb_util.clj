@@ -40,7 +40,18 @@
 
 (declare ^WriteCursor map->WriteHashMapCursor!)
 (declare ^WriteCursor coll->ArrayListCursor!)
-(declare ^WriteCursor coll->WriteCursor!)
+(declare ^WriteCursor list->LinkedArrayListCursor!)
+
+(def ^:dynamic *debug?* false)
+
+(defn lazy-seq? [v]
+  (instance? clojure.lang.LazySeq v))
+
+(defn vector-or-chunked? [v]
+  (or (vector? v) (chunked-seq? v)))
+
+(defn list-or-cons? [v]
+  (or (list? v) (instance? clojure.lang.Cons v)))
 
 (defn ^String keyname [key]
   (if (keyword? key)
@@ -62,6 +73,9 @@
   Throws an IllegalArgumentException for unsupported types."
   [v]
   (cond
+
+    (lazy-seq? v)
+    (throw (IllegalArgumentException. "Lazy sequences can be infinite and not allowed!"))
 
     (string? v)
     (database-bytes v)
@@ -119,7 +133,12 @@
       (.write cursor nil)
       (.slot (map->WriteHashMapCursor! cursor v)))
 
-    (coll? v)
+    (list-or-cons? v)
+    (do
+      (.write cursor nil)
+      (.slot (list->LinkedArrayListCursor! cursor v)))
+
+    (vector-or-chunked? v)
     (do
       (.write cursor nil)
       (.slot (coll->ArrayListCursor! cursor v)))
@@ -163,26 +182,26 @@
   (let [^WriteCursor cursor (-> wal .cursor)]
     (.write cursor (v->slot! cursor []))))
 
-(defn ^WriteLinkedArrayList linked-array-list-append-value!
+(defn linked-array-list-append-value!
   "Appends a value to a WriteLinkedArrayList.
   Converts the value to an appropriate XitDB representation using v->slot!."
   [^WriteLinkedArrayList wlal v]
   (let [cursor (.appendCursor wlal)]
     (.write cursor (v->slot! cursor v))
-    wlal))
+    nil))
 
-(defn ^WriteLinkedArrayList linked-list-insert-value!
-  [^WriteLinkedArrayList wlal v])
+(defn linked-array-list-insert-value!
+  "Appends a value to a WriteLinkedArrayList.
+  Converts the value to an appropriate XitDB representation using v->slot!."
+  [^WriteLinkedArrayList wlal pos v]
+  (let [cursor (-> wlal .cursor)]
+    (.insert wlal pos (v->slot! cursor v)))
+  nil)
 
-(defn ^WriteLinkedArrayList linked-array-list-append-all!
-  "Appends multiple values to a WriteLinkedArrayList.
-  Each value is processed and appended individually, avoiding loading all
-  values into memory at once."
-  [^WriteLinkedArrayList wlal values]
-  (doseq [v values]
-    (let [cursor (.appendCursor wlal)]
-      (.write cursor (v->slot! cursor v))))
-  wlal)
+(defn linked-array-list-pop!
+  [^WriteLinkedArrayList wlal]
+  (.remove wlal 0)
+  nil)
 
 (defn ^Database$Bytes db-key
   "Converts k from a Clojure type to a Database$Bytes representation to be used in
@@ -194,7 +213,8 @@
     :else
     (primitive-for k)))
 
-(def ^:dynamic *enable-map-fast-count?* false)
+;; Enable storing the count of items in the hashmap under an internal key :count
+(def ^:dynamic *enable-map-fast-count?* true)
 
 (defn- update-map-item-count!
   "Update the internal key `:count` by applying `f` to the current value.
@@ -268,11 +288,12 @@
 (defn map-write-cursor [^WriteHashMap whm key]
   (.putCursor whm (db-key key)))
 
-(defn coll->ArrayListCursor!
+(defn ^WriteCursor coll->ArrayListCursor!
   "Converts a Clojure collection to a XitDB ArrayList cursor.
   Handles nested maps and collections recursively.
   Returns the cursor of the created WriteArrayList."
-  [cursor coll]
+  [^WriteCursor cursor coll]
+  (when *debug?* (println "Write array" (type coll)))
   (let [write-array (WriteArrayList. cursor)]
     (doseq [v coll]
       (cond
@@ -280,7 +301,11 @@
         (let [v-cursor (.appendCursor write-array)]
           (map->WriteHashMapCursor! v-cursor v))
 
-        (coll? v)
+        (list-or-cons? v)
+        (let [v-cursor (.appendCursor write-array)]
+          (list->LinkedArrayListCursor! v-cursor v))
+
+        (vector-or-chunked? v)
         (let [v-cursor (.appendCursor write-array)]
           (coll->ArrayListCursor! v-cursor v))
 
@@ -288,28 +313,32 @@
         (.append write-array (primitive-for v))))
     (.-cursor write-array)))
 
-(defn ^WriteCursor coll->WriteCursor!
+(defn ^WriteCursor list->LinkedArrayListCursor!
   "Converts a Clojure list or seq-like collection to a XitDB LinkedArrayList cursor.
    Optimized for sequential access collections rather than random access ones."
-  [cursor coll]
-  (let [write-list (if (list? coll)
-                     (WriteLinkedArrayList. cursor)
-                     (WriteArrayList. cursor))]
+  [^WriteCursor cursor coll]
+  (when *debug?* (println "Write list" (type coll)))
+  (let [write-list (WriteLinkedArrayList. cursor)]
     (doseq [v coll]
-      (let [v-cursor (.appendCursor write-list)]
-        (cond
-          (map? v)
-          (map->WriteHashMapCursor! v-cursor v)
+      (when *debug?* (println "v=" v))
+      (cond
+        (map? v)
+        (let [v-cursor (.appendCursor write-list)]
+          (map->WriteHashMapCursor! v-cursor v))
 
-          ;(or (list? v) (instance? clojure.lang.LazySeq v))
-          (list? v)
-          (coll->WriteCursor! v-cursor v)
+        (lazy-seq? v)
+        (throw (IllegalArgumentException. "Lazy sequences can be infinite and not allowed !"))
 
-          (coll? v)
-          (coll->WriteCursor! v-cursor v)
+        (list-or-cons? v)
+        (let [v-cursor (.appendCursor write-list)]
+          (list->LinkedArrayListCursor! v-cursor v))
 
-          :else
-          (.append write-list (primitive-for v)))))
+        (vector-or-chunked? v)
+        (let [v-cursor (.appendCursor write-list)]
+          (coll->ArrayListCursor! v-cursor v))
+
+        :else
+        (.append write-list (primitive-for v))))
     (.-cursor write-list)))
 
 (defn ^WriteCursor map->WriteHashMapCursor!
@@ -367,8 +396,18 @@
                         (cons (clojure.lang.MapEntry. k v) (step))))))))]
       (step))))
 
-(defn array-seq [ral read-from-cursor]
+(defn array-seq [^ReadArrayList ral read-from-cursor]
   (let [iter (.iterator ral)
+        lazy-iter (fn lazy-iter []
+                    (when (.hasNext iter)
+                      (let [cursor (.next iter)
+                            value (read-from-cursor cursor)]
+                        (lazy-seq (cons value (lazy-iter))))))]
+    (lazy-iter)))
+
+;;Same as above, but different type hints
+(defn linked-array-seq [^ReadLinkedArrayList rlal read-from-cursor]
+  (let [iter (.iterator rlal)
         lazy-iter (fn lazy-iter []
                     (when (.hasNext iter)
                       (let [cursor (.next iter)

@@ -420,4 +420,31 @@
     (swap! db into [5 6])
     (is (= [1 2 3 4 5 5 6] @db))))
 
+(deftest LazySeqTest
+  (with-db [db (tu/test-db)]
+    (reset! db '(1 2 3))
+    (swap! db conj 44)
+
+    (testing "Throws on lazy seqs by concat"
+      (is (thrown? IllegalArgumentException (swap! db concat [1 2])))
+      (swap! db (comp vec concat) [1 2])
+      (is (= [44 1 2 3 1 2] @db))
+      (swap! db (comp seq concat) [99])
+      (is (= '(44 1 2 3 1 2 99) @db)))
+
+    (testing "Throws on take or drop"
+      (is (thrown? IllegalArgumentException (swap! db #(drop 3 %))))
+      (is (thrown? IllegalArgumentException (swap! db #(take 3 %))))
+      (swap! db #(vec (drop 3 %)))
+      (is (= @db [3 1 2 99])))))
+
+(deftest PopTest
+  (with-db [db (tu/test-db)]
+    (reset! db '(1 2 3 4 5))
+    (swap! db pop)
+    (is (= '(2 3 4 5) @db))
+    (is (tu/db-equal-to-atom? db))))
+
+
+
 

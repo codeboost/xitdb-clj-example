@@ -95,7 +95,7 @@
 ;---------------------------------------------------
 
 
-(deftype XITDBWriteHashMap [whm]
+(deftype XITDBWriteHashMap [^WriteHashMap whm]
   clojure.lang.IPersistentCollection
   (cons [this o]
 
